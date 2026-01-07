@@ -1,6 +1,9 @@
 {
-  // ESA 部署配置
-  // assetsDir: 前端构建产物所在目录
-  "assetsDir": "dist"
+  "name": "scistudio-ai",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "assets": {
+    "directory": "./dist",
+    "notFoundStrategy": "singlePageApplication"
+  }
 }
-
