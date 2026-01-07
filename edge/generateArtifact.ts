@@ -20,18 +20,32 @@ export async function handleEdgeGenerateArtifact(
   return generateScienceArtifactInternal(prompt, images, modelConfig, currentArtifact, history);
 }
 
-export default async function generateArtifactEntry(request: any): Promise<any> {
-  if (!request || typeof request.json !== "function") {
-    throw new Error("Edge entry expects a Request-like object with json() method");
-  }
-  const body = (await request.json()) as EdgeGenerateRequest;
-  const result = await handleEdgeGenerateArtifact(body);
-  if (typeof Response !== "undefined") {
-    return new Response(JSON.stringify(result), {
-      status: 200,
-      headers: { "Content-Type": "application/json" }
-    });
-  }
-  return result;
-}
+const createJsonResponse = (data: any, status = 200) => {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+};
 
+export default {
+  async fetch(request: Request): Promise<Response> {
+    if (request.method !== "POST") {
+      return createJsonResponse({ error: "Method Not Allowed" }, 405);
+    }
+
+    let body: EdgeGenerateRequest;
+    try {
+      body = (await request.json()) as EdgeGenerateRequest;
+    } catch {
+      return createJsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+
+    try {
+      const result = await handleEdgeGenerateArtifact(body);
+      return createJsonResponse(result, 200);
+    } catch (e: any) {
+      const message = e instanceof Error ? e.message : String(e);
+      return createJsonResponse({ error: message }, 500);
+    }
+  }
+};
