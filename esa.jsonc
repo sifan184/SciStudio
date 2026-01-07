@@ -2,6 +2,10 @@
   "name": "scistudio-ai",
   "installCommand": "npm install",
   "buildCommand": "npm run build",
+  "environmentVariables": {
+    "VITE_SUPABASE_URL": "https://spgwuvqmlcqkoeouiccd.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_jVXD8-b8RQdl5qB3SzQl6g_atxUG6IS"
+  },
   "assets": {
     "directory": "./dist",
     "notFoundStrategy": "singlePageApplication"

@@ -6,6 +6,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { WorksList } from './components/WorksList';
 import { generateScienceArtifact } from './services/geminiService';
 import * as Lucide from 'lucide-react';
+import { loadCloudSnapshot, saveCloudSnapshot } from './services/cloudStorage';
 
 const migrateWorks = (works: ScienceArtifact[]): ScienceArtifact[] => {
   return works.map(w => {
@@ -185,6 +186,46 @@ function AppInner() {
     setCurrentWorkId(null);
     setError(null);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const snapshot = await loadCloudSnapshot();
+        if (!snapshot || cancelled) return;
+        if (snapshot.works && snapshot.works.length > 0) {
+          setWorks(migrateWorks(snapshot.works));
+        }
+        if (snapshot.messagesMap) {
+          setMessagesMap(snapshot.messagesMap);
+        }
+        if (typeof snapshot.selectedModelId === "string" && snapshot.selectedModelId.length > 0) {
+          setSelectedModelId(snapshot.selectedModelId);
+        }
+        if (snapshot.modelsWithoutKeys && snapshot.modelsWithoutKeys.length > 0) {
+          setModels(prev => {
+            const byId: Record<string, ModelConfig> = {};
+            prev.forEach(m => {
+              byId[m.id] = m;
+            });
+            return snapshot.modelsWithoutKeys.map(m => {
+              const existing = byId[m.id];
+              if (existing && existing.apiKey) {
+                return { ...m, apiKey: existing.apiKey };
+              }
+              return m;
+            });
+          });
+        }
+      } catch (e) {
+        console.error("Load cloud snapshot error:", e);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleRuntimeError = (message: string) => {
     if (!activeWork) return;
@@ -415,6 +456,27 @@ function AppInner() {
     } catch {
     }
   }, [models]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const persist = async () => {
+      try {
+        const modelsWithoutKeys = models.map(m => {
+          const { apiKey, ...rest } = m;
+          return rest;
+        });
+        await saveCloudSnapshot({
+          works,
+          messagesMap,
+          selectedModelId,
+          modelsWithoutKeys
+        });
+      } catch (e) {
+        console.error("Save cloud snapshot error:", e);
+      }
+    };
+    persist();
+  }, [works, messagesMap, selectedModelId, models]);
 
   // --- Resize Handlers ---
   const startResizing = useCallback((e: React.MouseEvent) => {

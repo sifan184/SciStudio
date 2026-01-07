@@ -8,7 +8,7 @@ import {
 } from "../types";
 import { validateCode, lint3DScene, lintSafetyAndPerformance } from "../utils/codeUtils";
 
-const MAX_AUTO_REPAIR_ATTEMPTS = 2;
+const MAX_AUTO_REPAIR_ATTEMPTS = 1;
 
 const withNetworkRetry = async <T>(fn: () => Promise<T>, retries = 2, delay = 1000): Promise<T> => {
   try {
