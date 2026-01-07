@@ -233,6 +233,13 @@ const parseResponse = (text: string, currentArtifact: ScienceArtifact | null): G
     };
 };
 
+const getEnvApiKey = (isGlmProvider: boolean): string | undefined => {
+  if (typeof process === "undefined" || !process.env) {
+    return undefined;
+  }
+  return isGlmProvider ? process.env.ZAI_API_KEY : process.env.API_KEY;
+};
+
 export const generateScienceArtifactInternal = async (
   prompt: string,
   images: string[], 
@@ -242,7 +249,7 @@ export const generateScienceArtifactInternal = async (
 ): Promise<GenerationResponse> => {
   
   const isGlmProvider = modelConfig.provider === "Zhipu";
-  const envApiKey = isGlmProvider ? process.env.ZAI_API_KEY : process.env.API_KEY;
+  const envApiKey = getEnvApiKey(isGlmProvider);
   const apiKey = modelConfig.apiKey || envApiKey;
 
   if (!apiKey || apiKey === "PLACEHOLDER_API_KEY") {

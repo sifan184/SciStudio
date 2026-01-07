@@ -117,7 +117,7 @@ SciStudio AI 是一个基于 React + Vite 的交互式科学可视化工作室�
 4. 将 `assets.directory: ./dist` 作为静态资源目录进行托管
 5. 将未命中静态资源但属于 `/api/generate-artifact` 类的请求，路由到 `entry: ./edge/generateArtifact.ts` 对应的 Edge 函数处理
 
-### ESA 品牌截图
+### ESA 品牌
 
 阿里云 ESA Pages 官方横幅示意（可替换为你自己的控制台截图）：
 
