@@ -8,9 +8,10 @@ import {
 } from "../types";
 import { validateCode, lint3DScene, lintSafetyAndPerformance } from "../utils/codeUtils";
 
-const MAX_AUTO_REPAIR_ATTEMPTS = 2;
+const MAX_AUTO_REPAIR_ATTEMPTS = 1;
+const GENERATION_TIMEOUT_MS = 25000;
 
-const withNetworkRetry = async <T>(fn: () => Promise<T>, retries = 2, delay = 1000): Promise<T> => {
+const withNetworkRetry = async <T>(fn: () => Promise<T>, retries = 1, delay = 800): Promise<T> => {
   try {
     return await fn();
   } catch (error) {
@@ -21,6 +22,24 @@ const withNetworkRetry = async <T>(fn: () => Promise<T>, retries = 2, delay = 10
     }
     throw error;
   }
+};
+
+const withTimeout = <T>(promise: Promise<T>, ms: number, name = "operation"): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${name} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 };
 
 const callGemini = async (
@@ -240,7 +259,7 @@ const getEnvApiKey = (isGlmProvider: boolean): string | undefined => {
   return isGlmProvider ? process.env.ZAI_API_KEY : process.env.API_KEY;
 };
 
-export const generateScienceArtifactInternal = async (
+const generateScienceArtifactInternalCore = async (
   prompt: string,
   images: string[], 
   modelConfig: ModelConfig,
@@ -1248,6 +1267,20 @@ export const generateScienceArtifactInternal = async (
   }
 
   throw new Error(`Failed to generate valid code after ${MAX_AUTO_REPAIR_ATTEMPTS + 1} attempts. Last error: ${lastError}`);
+};
+
+export const generateScienceArtifactInternal = async (
+  prompt: string,
+  images: string[],
+  modelConfig: ModelConfig,
+  currentArtifact: ScienceArtifact | null,
+  history: ChatMessage[]
+): Promise<GenerationResponse> => {
+  return withTimeout(
+    generateScienceArtifactInternalCore(prompt, images, modelConfig, currentArtifact, history),
+    GENERATION_TIMEOUT_MS,
+    "generateScienceArtifactInternal"
+  );
 };
 
 export const generateScienceArtifact = async (
