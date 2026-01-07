@@ -1,5 +1,6 @@
 {
   "name": "SciStudio",
+  "entry": "./edge/generateArtifact.ts",
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "assets": {
@@ -7,4 +8,3 @@
     "notFoundStrategy": "singlePageApplication"
   }
 }
-
