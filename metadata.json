@@ -1,0 +1,5 @@
+{
+  "name": "SciStudio AI",
+  "description": "An AI-powered infrastructure for generating interactive scientific visualizations and simulations on demand.",
+  "requestFramePermissions": []
+}
