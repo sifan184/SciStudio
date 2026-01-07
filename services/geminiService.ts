@@ -233,7 +233,7 @@ const parseResponse = (text: string, currentArtifact: ScienceArtifact | null): G
     };
 };
 
-export const generateScienceArtifact = async (
+export const generateScienceArtifactInternal = async (
   prompt: string,
   images: string[], 
   modelConfig: ModelConfig,
@@ -1241,4 +1241,34 @@ export const generateScienceArtifact = async (
   }
 
   throw new Error(`Failed to generate valid code after ${MAX_AUTO_REPAIR_ATTEMPTS + 1} attempts. Last error: ${lastError}`);
+};
+
+export const generateScienceArtifact = async (
+  prompt: string,
+  images: string[],
+  modelConfig: ModelConfig,
+  currentArtifact: ScienceArtifact | null,
+  history: ChatMessage[]
+): Promise<GenerationResponse> => {
+  const response = await fetch("/api/generate-artifact", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt,
+      images,
+      modelConfig,
+      currentArtifact,
+      history
+    })
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`Edge generate API error: ${response.status} ${response.statusText} ${text}`);
+  }
+
+  const data = await response.json();
+  return data as GenerationResponse;
 };
