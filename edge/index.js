@@ -236,6 +236,14 @@ async function handleSignup(request) {
   }
 
   try {
+    if (typeof EdgeKV === "undefined") {
+      return jsonResponse(
+        {
+          error: "服务端 KV 存储未配置，暂时无法注册"
+        },
+        500
+      );
+    }
     const normalizedEmail = normalizeEmail(email);
     const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
     const emailKey = `user_email_${normalizedEmail}`;
@@ -301,6 +309,14 @@ async function handleLogin(request) {
   }
 
   try {
+    if (typeof EdgeKV === "undefined") {
+      return jsonResponse(
+        {
+          error: "服务端 KV 存储未配置，暂时无法登录"
+        },
+        500
+      );
+    }
     const normalizedEmail = normalizeEmail(email);
     const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
     const emailKey = `user_email_${normalizedEmail}`;
