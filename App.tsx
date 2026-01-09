@@ -391,9 +391,17 @@ function AppInner() {
           data && typeof data === "object" && typeof (data as any).error === "string"
             ? (data as any).error
             : null;
-        const fallback = res.status
-          ? `认证服务异常（HTTP ${res.status}），请稍后重试`
-          : "认证失败，请稍后重试";
+        let fallback = "认证失败，请稍后重试";
+        if (res.status) {
+          if (res.status === 599) {
+            fallback =
+              "认证服务异常（HTTP 599），通常表示边缘函数或网络超时，请稍后重试或联系运维检查 ESA 日志";
+          } else if (res.status >= 500) {
+            fallback = `认证服务内部错误（HTTP ${res.status}），请稍后重试`;
+          } else {
+            fallback = `认证服务异常（HTTP ${res.status}），请稍后重试`;
+          }
+        }
         const finalMessage = messageFromJson || fallback;
         setAuthError(finalMessage);
         if (!messageFromJson && text) {
@@ -412,7 +420,7 @@ function AppInner() {
       setAuthPasswordConfirm("");
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      setAuthError(message);
+      setAuthError(`认证请求失败：${message}`);
     }
   };
 
