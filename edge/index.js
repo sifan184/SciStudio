@@ -1,16 +1,20 @@
-import { createClient } from "@supabase/supabase-js";
-
 const EDGE_KV_NAMESPACE = "947407923057872896";
 
-function getSupabaseClient() {
+async function getSupabaseClient() {
   try {
     const url = (globalThis as any).SUPABASE_URL || "";
     const key = (globalThis as any).SUPABASE_ANON_KEY || "";
     if (!url || !key) {
       return null;
     }
+    const mod: any = await import("@supabase/supabase-js");
+    const createClient = mod.createClient || (mod.default && mod.default.createClient);
+    if (typeof createClient !== "function") {
+      return null;
+    }
     return createClient(url, key);
-  } catch {
+  } catch (e) {
+    console.error("Supabase client init error:", e);
     return null;
   }
 }
@@ -40,7 +44,7 @@ async function handleRequest(request) {
 }
 
 async function handleAuthRequest(request, url) {
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClient();
 
   if (!supabase) {
     return jsonResponse(
