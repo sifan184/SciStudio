@@ -35,50 +35,81 @@ async function getOssClient() {
 }
 
 async function saveWorkRecordToOss(record) {
-  const client = await getOssClient();
-  const key = `${record.id}.json`;
-  const body = JSON.stringify(record);
-  await client.put(key, body, {
-    headers: {
-      "Content-Type": "application/json; charset=utf-8"
-    }
-  });
+  try {
+    const client = await getOssClient();
+    const key = `${record.id}.json`;
+    const body = JSON.stringify(record);
+    await client.put(key, body, {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8"
+      }
+    });
+    return;
+  } catch (e) {
+  }
+  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const fallbackKey = `work_${record.id}_full`;
+  await edgeKV.put(fallbackKey, JSON.stringify(record));
 }
 
 async function loadWorkRecordFromOss(workId) {
-  const client = await getOssClient();
-  const key = `${workId}.json`;
   try {
-    const result = await client.get(key);
-    const body = result.content;
-    let text;
-    if (typeof body === "string") {
-      text = body;
-    } else if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
-      const decoder = new TextDecoder("utf-8");
-      text = decoder.decode(body);
-    } else {
-      text = String(body);
+    const client = await getOssClient();
+    const key = `${workId}.json`;
+    try {
+      const result = await client.get(key);
+      const body = result.content;
+      let text;
+      if (typeof body === "string") {
+        text = body;
+      } else if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+        const decoder = new TextDecoder("utf-8");
+        text = decoder.decode(body);
+      } else {
+        text = String(body);
+      }
+      return JSON.parse(text);
+    } catch (e) {
+      if (e && e.code === "NoSuchKey") {
+        return null;
+      }
+      throw e;
     }
-    return JSON.parse(text);
   } catch (e) {
-    if (e && e.code === "NoSuchKey") {
-      return null;
-    }
-    throw e;
+  }
+  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const fallbackKey = `work_${workId}_full`;
+  const text = await edgeKV.get(fallbackKey, { type: "text" });
+  if (!text) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
 }
 
 async function deleteWorkRecordFromOss(workId) {
-  const client = await getOssClient();
-  const key = `${workId}.json`;
   try {
-    await client.delete(key);
-  } catch (e) {
-    if (e && e.code === "NoSuchKey") {
+    const client = await getOssClient();
+    const key = `${workId}.json`;
+    try {
+      await client.delete(key);
       return;
+    } catch (e) {
+      if (e && e.code === "NoSuchKey") {
+        return;
+      }
+      throw e;
     }
-    throw e;
+  } catch (e) {
+  }
+  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const fallbackKey = `work_${workId}_full`;
+  try {
+    await edgeKV.delete(fallbackKey);
+  } catch {
   }
 }
 

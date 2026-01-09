@@ -5,6 +5,7 @@ import { ArtifactRenderer } from './components/ArtifactRenderer';
 import { ChatInterface } from './components/ChatInterface';
 import { WorksList } from './components/WorksList';
 import { generateScienceArtifact } from './services/geminiService';
+import { loadCloudSnapshot } from './services/cloudStorage';
 import * as Lucide from 'lucide-react';
 
 const migrateWorks = (works: ScienceArtifact[]): ScienceArtifact[] => {
