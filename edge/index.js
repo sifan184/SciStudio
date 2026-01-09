@@ -54,17 +54,6 @@ async function handleRequest(request) {
 }
 
 async function handleAuthRequest(request, url) {
-  const supabase = await getSupabaseClient();
-
-  if (!supabase) {
-    return jsonResponse(
-      {
-        error: "Supabase 未配置，请在 ESA 环境变量中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY"
-      },
-      500
-    );
-  }
-
   if (request.method !== "POST") {
     return jsonResponse(
       {
@@ -77,6 +66,26 @@ async function handleAuthRequest(request, url) {
   let path = url.pathname;
   if (path.length > 1 && path.endsWith("/")) {
     path = path.replace(/\/+$/, "");
+  }
+
+  if (path.endsWith("/api/auth/user")) {
+    return jsonResponse(
+      {
+        user: null
+      },
+      200
+    );
+  }
+
+  const supabase = await getSupabaseClient();
+
+  if (!supabase) {
+    return jsonResponse(
+      {
+        error: "Supabase 未配置，请在 ESA 环境变量中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY"
+      },
+      500
+    );
   }
 
   if (path.endsWith("/api/auth/signup")) {
