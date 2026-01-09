@@ -50,21 +50,7 @@ function buildClearSessionCookie() {
   return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
 
-async function hashPassword(password) {
-  try {
-    if (globalThis.crypto && crypto.subtle && typeof crypto.subtle.digest === "function") {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(password);
-      const digest = await crypto.subtle.digest("SHA-256", data);
-      const bytes = new Uint8Array(digest);
-      let hex = "";
-      for (let i = 0; i < bytes.length; i++) {
-        hex += bytes[i].toString(16).padStart(2, "0");
-      }
-      return hex;
-    }
-  } catch {
-  }
+function hashPassword(password) {
   let hash = 0;
   for (let i = 0; i < password.length; i++) {
     const chr = password.charCodeAt(i);
@@ -236,14 +222,6 @@ async function handleSignup(request) {
   }
 
   try {
-    if (typeof EdgeKV === "undefined") {
-      return jsonResponse(
-        {
-          error: "服务端 KV 存储未配置，暂时无法注册"
-        },
-        500
-      );
-    }
     const normalizedEmail = normalizeEmail(email);
     const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
     const emailKey = `user_email_${normalizedEmail}`;
@@ -258,7 +236,7 @@ async function handleSignup(request) {
     }
 
     const userId = generateId("u_");
-    const passwordHash = await hashPassword(password);
+    const passwordHash = hashPassword(password);
     const userRecord = {
       id: userId,
       email: normalizedEmail,
@@ -309,14 +287,6 @@ async function handleLogin(request) {
   }
 
   try {
-    if (typeof EdgeKV === "undefined") {
-      return jsonResponse(
-        {
-          error: "服务端 KV 存储未配置，暂时无法登录"
-        },
-        500
-      );
-    }
     const normalizedEmail = normalizeEmail(email);
     const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
     const emailKey = `user_email_${normalizedEmail}`;
@@ -341,7 +311,7 @@ async function handleLogin(request) {
     }
 
     const storedHash = userRecord.passwordHash;
-    const currentHash = await hashPassword(password);
+    const currentHash = hashPassword(password);
     if (!storedHash || storedHash !== currentHash) {
       return jsonResponse(
         {
