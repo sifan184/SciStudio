@@ -307,3 +307,7 @@ export default {
     return handleRequest(request);
   }
 };
+
+export async function fetch(request, env, ctx) {
+  return handleRequest(request);
+}
