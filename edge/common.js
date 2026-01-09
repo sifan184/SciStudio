@@ -1,5 +1,3 @@
-import OSS from "ali-oss";
-
 const EDGE_KV_NAMESPACE = "SciStudio";
 const OSS_BUCKET_NAME = "scistudio";
 const SESSION_COOKIE_NAME = "scistudio_session";
@@ -15,7 +13,7 @@ function getEnv() {
   return ESA_ENV;
 }
 
-function getOssClient() {
+async function getOssClient() {
   if (!ESA_ENV || typeof ESA_ENV !== "object") {
     throw new Error("OSS env not available");
   }
@@ -26,6 +24,8 @@ function getOssClient() {
   if (!region || !accessKeyId || !accessKeySecret) {
     throw new Error("OSS credentials not configured");
   }
+  const mod = await import("ali-oss");
+  const OSS = mod.default || mod;
   return new OSS({
     region,
     accessKeyId,
@@ -35,7 +35,7 @@ function getOssClient() {
 }
 
 async function saveWorkRecordToOss(record) {
-  const client = getOssClient();
+  const client = await getOssClient();
   const key = `${record.id}.json`;
   const body = JSON.stringify(record);
   await client.put(key, body, {
@@ -46,7 +46,7 @@ async function saveWorkRecordToOss(record) {
 }
 
 async function loadWorkRecordFromOss(workId) {
-  const client = getOssClient();
+  const client = await getOssClient();
   const key = `${workId}.json`;
   try {
     const result = await client.get(key);
@@ -70,7 +70,7 @@ async function loadWorkRecordFromOss(workId) {
 }
 
 async function deleteWorkRecordFromOss(workId) {
-  const client = getOssClient();
+  const client = await getOssClient();
   const key = `${workId}.json`;
   try {
     await client.delete(key);
@@ -238,4 +238,3 @@ export {
   parseJsonBody,
   jsonResponse
 };
-
