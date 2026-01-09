@@ -3,13 +3,13 @@
 export type Language = 'zh' | 'en';
 
 export interface ScienceArtifact {
-  id: string; // UUID
+  id: string;
   createdAt: number;
   title: string;
   description: string;
-  // The complete React Functional Component code (as a string)
-  // This code will be compiled and executed at runtime.
-  code: string; 
+  code: string;
+  ownerId?: string;
+  ownerEmail?: string | null;
 }
 
 export interface ChatMessage {

@@ -1,7 +1,26 @@
+import { createClient } from "@supabase/supabase-js";
+
 const EDGE_KV_NAMESPACE = "SciStudio";
 let ESA_ENV = null;
 
 const SESSION_COOKIE_NAME = "scistudio_session";
+const WORKS_INDEX_KEY = "works_index";
+
+function getSupabaseClient() {
+  if (!ESA_ENV || typeof ESA_ENV !== "object") {
+    throw new Error("Supabase env not available");
+  }
+  const url = ESA_ENV.SUPABASE_URL;
+  const serviceKey = ESA_ENV.SUPABASE_SERVICE_ROLE_KEY || ESA_ENV.SUPABASE_ANON_KEY;
+  if (!url || !serviceKey) {
+    throw new Error("Supabase credentials not configured");
+  }
+  return createClient(url, serviceKey, {
+    auth: {
+      persistSession: false
+    }
+  });
+}
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
@@ -109,6 +128,50 @@ async function getUserFromRequest(request) {
   return getUserFromSession(sessionId);
 }
 
+async function handleWorksRequest(request, url) {
+  const path = url.pathname.replace(/\/+$/, "");
+  const segments = path.split("/").filter(Boolean);
+  const hasId = segments.length === 3;
+  if (!hasId) {
+    if (request.method === "GET") {
+      return handleWorksList();
+    }
+    if (request.method === "POST") {
+      return handleWorkCreate(request);
+    }
+    return jsonResponse(
+      {
+        error: "不支持的作品接口方法"
+      },
+      405
+    );
+  }
+  const workId = segments[segments.length - 1];
+  if (!workId) {
+    return jsonResponse(
+      {
+        error: "缺少作品ID"
+      },
+      400
+    );
+  }
+  if (request.method === "GET") {
+    return handleWorkGet(request, workId);
+  }
+  if (request.method === "PUT" || request.method === "PATCH") {
+    return handleWorkUpdate(request, workId);
+  }
+  if (request.method === "DELETE") {
+    return handleWorkDelete(request, workId);
+  }
+  return jsonResponse(
+    {
+      error: "不支持的作品接口方法"
+    },
+    405
+  );
+}
+
 async function handleRequest(request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -122,12 +185,12 @@ async function handleRequest(request) {
     );
   }
 
-  if (pathname.endsWith("/api/cloud/snapshot")) {
-    return handleCloudSnapshot(request, url);
-  }
-
   if (pathname.includes("/api/auth/")) {
     return handleAuthRequest(request, url);
+  }
+
+  if (pathname.startsWith("/api/works")) {
+    return handleWorksRequest(request, url);
   }
 
   return fetch(request);
@@ -196,6 +259,137 @@ async function parseJsonBody(request) {
   } catch {
     return {};
   }
+}
+
+async function handleWorksList() {
+  try {
+    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
+    if (!Array.isArray(list)) {
+      return jsonResponse(
+        {
+          works: []
+        },
+        200
+      );
+    }
+    return jsonResponse(
+      {
+        works: list
+      },
+      200
+    );
+  } catch (e) {
+    return jsonResponse(
+      {
+        error: "读取作品列表失败"
+      },
+      500
+    );
+  }
+}
+
+async function handleWorkCreate(request) {
+  const user = await getUserFromRequest(request);
+  if (!user) {
+    return jsonResponse(
+      {
+        error: "未登录"
+      },
+      401
+    );
+  }
+  const body = await parseJsonBody(request);
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const description = typeof body.description === "string" ? body.description.trim() : "";
+  const baseArtifact = typeof body.baseArtifact === "object" && body.baseArtifact !== null ? body.baseArtifact : null;
+  const sourceWorkId = typeof body.sourceWorkId === "string" ? body.sourceWorkId : "";
+  const now = Date.now();
+  const workId = generateId("w_");
+  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const supabase = getSupabaseClient();
+
+  let artifact = baseArtifact;
+  let messages = null;
+
+  if (!artifact && sourceWorkId) {
+    const { data, error } = await supabase
+      .from("works")
+      .select("artifact,messages,title,description,created_at")
+      .eq("id", sourceWorkId)
+      .maybeSingle();
+    if (!error && data && data.artifact) {
+      artifact = data.artifact;
+      messages = data.messages || null;
+    }
+  }
+
+  if (!artifact) {
+    artifact = {
+      id: workId,
+      createdAt: now,
+      title: title || "未命名作品",
+      description: description || "",
+      code: "",
+      ownerId: user.id,
+      ownerEmail: user.email ?? null
+    };
+  } else {
+    artifact = {
+      ...artifact,
+      id: workId,
+      createdAt: now,
+      ownerId: user.id,
+      ownerEmail: user.email ?? null
+    };
+  }
+
+  const supabasePayload = {
+    id: workId,
+    user_id: user.id,
+    owner_email: user.email ?? null,
+    title: artifact.title,
+    description: artifact.description,
+    code: artifact.code,
+    created_at: new Date(now).toISOString(),
+    updated_at: new Date(now).toISOString(),
+    artifact,
+    messages
+  };
+
+  const { error: insertError } = await supabase.from("works").insert(supabasePayload);
+  if (insertError) {
+    return jsonResponse(
+      {
+        error: "创建作品失败"
+      },
+      500
+    );
+  }
+
+  let currentList = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
+  if (!Array.isArray(currentList)) {
+    currentList = [];
+  }
+  const summary = {
+    id: workId,
+    title: artifact.title,
+    description: artifact.description,
+    createdAt: now,
+    ownerId: user.id,
+    ownerEmail: user.email ?? null
+  };
+  await edgeKV.put(WORKS_INDEX_KEY, JSON.stringify([summary, ...currentList]));
+  await edgeKV.put(`work_${workId}_owner`, user.id);
+
+  return jsonResponse(
+    {
+      work: {
+        ...artifact
+      }
+    },
+    200
+  );
 }
 
 async function handleSignup(request) {
@@ -271,6 +465,121 @@ async function handleSignup(request) {
       500
     );
   }
+}
+
+async function handleWorkGet(request, workId) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("works")
+    .select("id,user_id,owner_email,title,description,code,artifact,created_at,updated_at,messages")
+    .eq("id", workId)
+    .maybeSingle();
+  if (error || !data) {
+    return jsonResponse(
+      {
+        error: "作品不存在"
+      },
+      404
+    );
+  }
+  const createdAt = data.artifact && typeof data.artifact.createdAt === "number" ? data.artifact.createdAt : Date.parse(data.created_at || "") || Date.now();
+  const artifact = data.artifact && typeof data.artifact === "object"
+    ? {
+        ...data.artifact,
+        id: data.id,
+        ownerId: data.user_id,
+        ownerEmail: data.owner_email ?? null,
+        createdAt
+      }
+    : {
+        id: data.id,
+        createdAt,
+        title: data.title || "",
+        description: data.description || "",
+        code: data.code || "",
+        ownerId: data.user_id,
+        ownerEmail: data.owner_email ?? null
+      };
+  return jsonResponse(
+    {
+      work: artifact,
+      messages: data.messages || []
+    },
+    200
+  );
+}
+
+async function handleWorkUpdate(request, workId) {
+  const user = await getUserFromRequest(request);
+  if (!user) {
+    return jsonResponse(
+      {
+        error: "未登录"
+      },
+      401
+    );
+  }
+  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const ownerId = await edgeKV.get(`work_${workId}_owner`, { type: "text" });
+  if (!ownerId || ownerId !== user.id) {
+    return jsonResponse(
+      {
+        error: "无权编辑此作品"
+      },
+      403
+    );
+  }
+  const body = await parseJsonBody(request);
+  const artifact = body.artifact && typeof body.artifact === "object" ? body.artifact : null;
+  const messages = Array.isArray(body.messages) ? body.messages : null;
+  if (!artifact) {
+    return jsonResponse(
+      {
+        error: "缺少作品内容"
+      },
+      400
+    );
+  }
+  const supabase = getSupabaseClient();
+  const nowIso = new Date().toISOString();
+  const updatePayload = {
+    title: artifact.title,
+    description: artifact.description,
+    code: artifact.code,
+    updated_at: nowIso,
+    artifact,
+    messages
+  };
+  const { error } = await supabase.from("works").update(updatePayload).eq("id", workId);
+  if (error) {
+    return jsonResponse(
+      {
+        error: "更新作品失败"
+      },
+      500
+    );
+  }
+
+  let list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
+  if (Array.isArray(list)) {
+    const updated = list.map((item) =>
+      item && item.id === workId
+        ? {
+            ...item,
+            title: artifact.title,
+            description: artifact.description
+          }
+        : item
+    );
+    await edgeKV.put(WORKS_INDEX_KEY, JSON.stringify(updated));
+  }
+
+  return jsonResponse(
+    {
+      ok: true
+    },
+    200
+  );
 }
 
 async function handleLogin(request) {
@@ -369,107 +678,42 @@ async function handleLogout(request) {
   );
 }
 
-async function handleCloudSnapshot(request, url) {
-  if (request.method === "GET") {
-    return handleCloudSnapshotGet(url);
+async function handleWorkDelete(request, workId) {
+  const user = await getUserFromRequest(request);
+  if (!user) {
+    return jsonResponse(
+      {
+        error: "未登录"
+      },
+      401
+    );
   }
+  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const ownerId = await edgeKV.get(`work_${workId}_owner`, { type: "text" });
+  if (!ownerId || ownerId !== user.id) {
+    return jsonResponse(
+      {
+        error: "无权删除此作品"
+      },
+      403
+    );
+  }
+  const supabase = getSupabaseClient();
+  await supabase.from("works").delete().eq("id", workId);
 
-  if (request.method === "POST") {
-    return handleCloudSnapshotPost(request);
+  let list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
+  if (Array.isArray(list)) {
+    const filtered = list.filter((item) => item && item.id !== workId);
+    await edgeKV.put(WORKS_INDEX_KEY, JSON.stringify(filtered));
   }
+  await edgeKV.put(`work_${workId}_owner`, "", {});
 
   return jsonResponse(
     {
-      error: "仅支持 GET 和 POST 请求"
+      ok: true
     },
-    405
+    200
   );
-}
-
-async function handleCloudSnapshotGet(url) {
-  const userId = url.searchParams.get("userId");
-  if (!userId) {
-    return jsonResponse(
-      {
-        error: "必须提供 userId"
-      },
-      400
-    );
-  }
-
-  try {
-    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
-    const key = `user_${userId}_snapshot`;
-    const value = await edgeKV.get(key, { type: "json" });
-
-    if (value === undefined) {
-      return jsonResponse(
-        {
-          snapshot: null
-        },
-        200
-      );
-    }
-
-    return jsonResponse(
-      {
-        snapshot: value
-      },
-      200
-    );
-  } catch (e) {
-    return jsonResponse(
-      {
-        error: "读取云端快照失败"
-      },
-      500
-    );
-  }
-}
-
-async function handleCloudSnapshotPost(request) {
-  const body = await parseJsonBody(request);
-  const userId = typeof body.userId === "string" ? body.userId : "";
-  const snapshot = body.snapshot;
-
-  if (!userId) {
-    return jsonResponse(
-      {
-        error: "必须提供 userId"
-      },
-      400
-    );
-  }
-
-  if (!snapshot || typeof snapshot !== "object") {
-    return jsonResponse(
-      {
-        error: "snapshot 内容无效"
-      },
-      400
-    );
-  }
-
-  try {
-    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
-    const key = `user_${userId}_snapshot`;
-    const value = JSON.stringify(snapshot);
-    await edgeKV.put(key, value);
-
-    return jsonResponse(
-      {
-        ok: true
-      },
-      200
-    );
-  } catch (e) {
-    return jsonResponse(
-      {
-        error: "保存云端快照失败"
-      },
-      500
-    );
-  }
 }
 
 function jsonResponse(body, status, extraHeaders) {

@@ -6,7 +6,6 @@ import { ChatInterface } from './components/ChatInterface';
 import { WorksList } from './components/WorksList';
 import { generateScienceArtifact } from './services/geminiService';
 import * as Lucide from 'lucide-react';
-import { loadCloudSnapshot, saveCloudSnapshot } from './services/cloudStorage';
 
 const migrateWorks = (works: ScienceArtifact[]): ScienceArtifact[] => {
   return works.map(w => {
@@ -61,20 +60,7 @@ function AppInner() {
   }
   // Global State
   const [works, setWorks] = useState<ScienceArtifact[]>(() => {
-    if (typeof window === 'undefined') {
-      return [INITIAL_ARTIFACT, ...ADDITIONAL_WORKS];
-    }
-    try {
-      const raw = window.localStorage.getItem('scistudio-works');
-      if (!raw) return [INITIAL_ARTIFACT, ...ADDITIONAL_WORKS];
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        return [INITIAL_ARTIFACT, ...ADDITIONAL_WORKS];
-      }
-      return migrateWorks(parsed);
-    } catch {
-      return [INITIAL_ARTIFACT, ...ADDITIONAL_WORKS];
-    }
+    return [INITIAL_ARTIFACT, ...ADDITIONAL_WORKS];
   });
   const [currentWorkId, setCurrentWorkId] = useState<string | null>(() => {
     if (typeof window === 'undefined') {
@@ -87,20 +73,7 @@ function AppInner() {
       return null;
     }
   });
-  const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>(() => {
-    if (typeof window === 'undefined') {
-      return {};
-    }
-    try {
-      const raw = window.localStorage.getItem('scistudio-messages');
-      if (!raw) return {};
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return {};
-      return parsed as Record<string, ChatMessage[]>;
-    } catch {
-      return {};
-    }
-  });
+  const [messagesMap, setMessagesMap] = useState<Record<string, ChatMessage[]>>({});
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -160,6 +133,7 @@ function AppInner() {
   // Derived State
   const activeWork = works.find(w => w.id === currentWorkId);
   const activeMessages = currentWorkId ? (messagesMap[currentWorkId] || []) : [];
+  const canEditActiveWork = !!(activeWork && authUser && activeWork.ownerId === authUser.id);
 
   // --- Actions ---
 
@@ -168,30 +142,146 @@ function AppInner() {
   };
 
   const handleSelectWork = (id: string) => {
-    setCurrentWorkId(id);
     setError(null);
-    setIsChatOpen(false); // Default to collapsed thumbnail when opening existing
+    setIsChatOpen(false);
+    const work = works.find(w => w.id === id);
+    if (id.startsWith("w_")) {
+      (async () => {
+        try {
+          const res = await fetch(`/api/works/${id}`, {
+            credentials: "include"
+          });
+          if (!res.ok) {
+            return;
+          }
+          const json = await res.json();
+          const remoteWork = json.work as ScienceArtifact;
+          const remoteMessages = (json.messages as ChatMessage[]) || [];
+          setWorks(prev => {
+            const exists = prev.some(w => w.id === remoteWork.id);
+            if (exists) {
+              return prev.map(w => (w.id === remoteWork.id ? remoteWork : w));
+            }
+            return [remoteWork, ...prev];
+          });
+          setMessagesMap(prev => ({
+            ...prev,
+            [remoteWork.id]: remoteMessages
+          }));
+          setCurrentWorkId(remoteWork.id);
+        } catch {
+        }
+      })();
+    } else if (work) {
+      setCurrentWorkId(id);
+    }
   };
 
   const handleCreateWork = () => {
-    const newId = crypto.randomUUID();
-    const newWork = { ...BLANK_ARTIFACT, id: newId, createdAt: Date.now() };
-    setWorks(prev => [newWork, ...prev]);
-    setCurrentWorkId(newId);
-    setError(null);
-    setIsChatOpen(true); // Default to OPEN when creating new
+    if (!authUser) {
+      setIsAuthPanelOpen(true);
+      setAuthError("请先登录后再创建作品");
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch("/api/works", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            baseArtifact: BLANK_ARTIFACT
+          })
+        });
+        if (!res.ok) {
+          setError("创建作品失败");
+          return;
+        }
+        const json = await res.json();
+        const work = json.work as ScienceArtifact;
+        setWorks(prev => [work, ...prev]);
+        setMessagesMap(prev => ({
+          ...prev,
+          [work.id]: []
+        }));
+        setCurrentWorkId(work.id);
+        setError(null);
+        setIsChatOpen(true);
+      } catch {
+        setError("创建作品失败");
+      }
+    })();
+  };
+
+  const handleDuplicateWork = (id: string) => {
+    if (!authUser) {
+      setIsAuthPanelOpen(true);
+      setAuthError("请先登录后再创建作品");
+      return;
+    }
+    const source = works.find(w => w.id === id) || null;
+    const baseArtifact = source && !id.startsWith("w_") ? source : null;
+    (async () => {
+      try {
+        const res = await fetch("/api/works", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json"
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            baseArtifact,
+            sourceWorkId: id
+          })
+        });
+        if (!res.ok) {
+          setError("创建作品失败");
+          return;
+        }
+        const json = await res.json();
+        const work = json.work as ScienceArtifact;
+        setWorks(prev => [work, ...prev]);
+        setMessagesMap(prev => ({
+          ...prev,
+          [work.id]: baseArtifact ? (messagesMap[id] || []) : []
+        }));
+        setCurrentWorkId(work.id);
+        setError(null);
+        setIsChatOpen(true);
+      } catch {
+        setError("创建作品失败");
+      }
+    })();
   };
 
   const handleDeleteWork = (id: string) => {
+    const work = works.find(w => w.id === id);
+    if (!work) {
+      return;
+    }
+    if (!authUser || work.ownerId !== authUser.id || !id.startsWith("w_")) {
+      return;
+    }
     setWorks(prev => prev.filter(w => w.id !== id));
     if (currentWorkId === id) {
       setCurrentWorkId(null);
     }
     setMessagesMap(prev => {
-        const newMap = { ...prev };
-        delete newMap[id];
-        return newMap;
+      const newMap = { ...prev };
+      delete newMap[id];
+      return newMap;
     });
+    (async () => {
+      try {
+        await fetch(`/api/works/${id}`, {
+          method: "DELETE",
+          credentials: "include"
+        });
+      } catch {
+      }
+    })();
   };
 
   const handleHomeClick = () => {
@@ -340,9 +430,31 @@ function AppInner() {
     }
   };
 
+  const persistWorkState = async (workId: string, artifact: ScienceArtifact, messages: ChatMessage[]) => {
+    if (!authUser) return;
+    if (!workId.startsWith("w_")) return;
+    try {
+      await fetch(`/api/works/${workId}`, {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          artifact,
+          messages
+        })
+      });
+    } catch {
+    }
+  };
+
   const handleRuntimeError = (message: string) => {
     if (!activeWork) return;
-     if (isGenerating) return;
+    if (!isGenerating) {
+    } else {
+      return;
+    }
     const workId = activeWork.id;
     const codeSignature = activeWork.code;
     const lastSignature = autoRetryRef.current[workId] || null;
@@ -398,9 +510,17 @@ function AppInner() {
           return;
         }
 
+        const updatedArtifact: ScienceArtifact = {
+          ...response.artifact,
+          id: workId,
+          createdAt: activeWork.createdAt,
+          ownerId: activeWork.ownerId,
+          ownerEmail: activeWork.ownerEmail
+        };
+
         setWorks(prev =>
           prev.map(w =>
-            w.id === workId ? { ...response.artifact, id: workId, createdAt: activeWork.createdAt } : w
+            w.id === workId ? updatedArtifact : w
           )
         );
 
@@ -410,10 +530,14 @@ function AppInner() {
           text: response.reply || "已根据运行时错误自动重试并修复。"
         };
 
+        let finalMessages: ChatMessage[] = [];
         setMessagesMap(prev => {
           const existing = prev[workId] || newHistory;
-          return { ...prev, [workId]: [...existing, modelMsg] };
+          const combined = [...existing, modelMsg];
+          finalMessages = combined;
+          return { ...prev, [workId]: combined };
         });
+        await persistWorkState(workId, updatedArtifact, finalMessages);
       } catch (e: any) {
         console.error("Silent retry error:", e);
         const rawMessage = e instanceof Error ? e.message : String(e);
@@ -426,6 +550,10 @@ function AppInner() {
 
   const handleGenerate = async (prompt: string, images: string[]) => {
     if (!activeWork) return;
+    if (!authUser || !activeWork.ownerId || activeWork.ownerId !== authUser.id || !activeWork.id.startsWith("w_")) {
+      setError("只有作品创建者才能编辑此作品");
+      return;
+    }
 
     setIsGenerating(true);
     setError(null);
@@ -452,8 +580,16 @@ function AppInner() {
           activeWork, 
           newHistory
       );
-      
-      setWorks(prev => prev.map(w => w.id === activeWork.id ? { ...response.artifact, id: activeWork.id, createdAt: activeWork.createdAt } : w));
+
+      const updatedArtifact: ScienceArtifact = {
+        ...response.artifact,
+        id: activeWork.id,
+        createdAt: activeWork.createdAt,
+        ownerId: activeWork.ownerId,
+        ownerEmail: activeWork.ownerEmail
+      };
+
+      setWorks(prev => prev.map(w => w.id === activeWork.id ? updatedArtifact : w));
       
       const modelMsg: ChatMessage = { 
         id: (Date.now() + 1).toString(), 
@@ -461,7 +597,13 @@ function AppInner() {
         text: response.reply || "已更新配置。"
       };
       
-      setMessagesMap(prev => ({ ...prev, [activeWork.id]: [...newHistory, modelMsg] }));
+      let finalMessages: ChatMessage[] = [];
+      setMessagesMap(prev => {
+        const combined = [...newHistory, modelMsg];
+        finalMessages = combined;
+        return { ...prev, [activeWork.id]: combined };
+      });
+      await persistWorkState(activeWork.id, updatedArtifact, finalMessages);
 
     } catch (e: any) {
       console.error("App Generate Error:", e);
@@ -518,14 +660,6 @@ function AppInner() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      window.localStorage.setItem('scistudio-works', JSON.stringify(works));
-    } catch {
-    }
-  }, [works]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
       if (currentWorkId) {
         window.localStorage.setItem('scistudio-currentWorkId', currentWorkId);
       } else {
@@ -534,14 +668,6 @@ function AppInner() {
     } catch {
     }
   }, [currentWorkId]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem('scistudio-messages', JSON.stringify(messagesMap));
-    } catch {
-    }
-  }, [messagesMap]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -571,26 +697,39 @@ function AppInner() {
   }, [models]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!authUser) return;
-    const persist = async () => {
+    let cancelled = false;
+    const loadWorks = async () => {
       try {
-        const modelsWithoutKeys = models.map(m => {
-          const { apiKey, ...rest } = m;
-          return rest;
+        const res = await fetch("/api/works", {
+          credentials: "include"
         });
-        await saveCloudSnapshot(authUser.id, {
-          works,
-          messagesMap,
-          selectedModelId,
-          modelsWithoutKeys
+        if (!res.ok) {
+          return;
+        }
+        const json = await res.json();
+        const serverWorks = (json.works as ScienceArtifact[]) || [];
+        if (cancelled) return;
+        setWorks(prev => {
+          const byId: Record<string, boolean> = {};
+          prev.forEach(w => {
+            byId[w.id] = true;
+          });
+          const merged = [...prev];
+          serverWorks.forEach(w => {
+            if (!byId[w.id]) {
+              merged.push(w);
+            }
+          });
+          return merged;
         });
-      } catch (e) {
-        console.error("Save cloud snapshot error:", e);
+      } catch {
       }
     };
-    persist();
-  }, [authUser, works, messagesMap, selectedModelId, models]);
+    loadWorks();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // --- Resize Handlers ---
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -769,12 +908,14 @@ function AppInner() {
                   onSelect={handleSelectWork} 
                   onCreate={handleCreateWork}
                   onDelete={handleDeleteWork}
+                  onDuplicate={handleDuplicateWork}
+                  currentUserId={authUser ? authUser.id : null}
               />
            )}
         </main>
 
         {/* Chat Sidebar (Conditional) */}
-        {activeWork && isChatOpen && (
+        {activeWork && isChatOpen && canEditActiveWork && (
           <aside 
             className={`flex-shrink-0 z-40 shadow-2xl border-l border-slate-800 bg-slate-900 relative flex flex-col ${isResizing ? 'transition-none' : 'transition-[width] duration-300'}`}
             style={{ width: sidebarWidth }}
@@ -801,7 +942,7 @@ function AppInner() {
         )}
 
         {/* Floating Chat Thumbnail */}
-        {activeWork && !isChatOpen && (
+        {activeWork && !isChatOpen && canEditActiveWork && (
           <button 
             onClick={() => setIsChatOpen(true)}
             className="absolute bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-brand-600 hover:bg-brand-500 shadow-xl shadow-brand-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95 group"

@@ -6,9 +6,11 @@ interface WorksListProps {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  currentUserId: string | null;
 }
 
-export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate, onDelete }) => {
+export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate, onDelete, onDuplicate, currentUserId }) => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const t = {
@@ -17,10 +19,25 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
     noWorks: "还没有作品",
     start: "创建一个全新的互动实验",
     created: "创建于",
+    creator: "创建者",
     deleteTitle: "删除作品",
     deleteMsg: "确定要删除该作品吗？此操作无法撤销。",
     cancel: "取消",
-    confirm: "删除"
+    confirm: "删除",
+    duplicate: "做同款"
+  };
+
+  const maskEmail = (email: string) => {
+    const parts = email.split("@");
+    if (parts.length !== 2) return email;
+    const name = parts[0];
+    const domain = parts[1];
+    if (name.length <= 2) {
+      return name[0] + "**@" + domain;
+    }
+    const head = name[0];
+    const tail = name[name.length - 1];
+    return `${head}**${tail}@${domain}`;
   };
 
   const handleDeleteRequest = (e: React.MouseEvent, id: string) => {
@@ -50,12 +67,14 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
              <p className="text-slate-500 text-sm mt-2">{t.start}</p>
         </div>
 
-        {works.map((work) => (
+        {works.map((work) => {
+          const isOwner = !!currentUserId && work.ownerId === currentUserId;
+          return (
           <div 
             key={work.id} 
             className="bg-slate-850 border border-slate-700 rounded-2xl p-6 flex flex-col hover:border-slate-500 transition-all group shadow-lg hover:shadow-xl min-h-[250px] relative"
           >
-            {/* Delete Button */}
+            {isOwner && (
             <button 
                 onClick={(e) => handleDeleteRequest(e, work.id)}
                 className="absolute top-4 right-4 p-2 text-slate-600 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors opacity-0 group-hover:opacity-100 z-10"
@@ -63,6 +82,7 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
             >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
             </button>
+            )}
 
             <div className="mb-4 pr-8">
                 <div className="flex justify-between items-start">
@@ -76,16 +96,30 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
             <div className="mt-auto pt-4 border-t border-slate-800 flex items-center justify-between">
                 <span className="text-xs text-slate-600 font-mono">
                     {t.created}: {new Date(work.createdAt).toLocaleDateString()}
+                    {work.ownerEmail && (
+                      <span className="ml-2">
+                        {t.creator}: {maskEmail(work.ownerEmail)}
+                      </span>
+                    )}
                 </span>
-                <button 
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => onDuplicate(work.id)}
+                    className="text-sm bg-slate-900 hover:bg-slate-800 text-slate-200 px-3 py-2 rounded-lg transition-colors border border-slate-700 hover:border-slate-600"
+                  >
+                    {t.duplicate}
+                  </button>
+                  <button 
                     onClick={() => onSelect(work.id)}
                     className="text-sm bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 hover:border-slate-600"
-                >
+                  >
                     {t.open}
-                </button>
+                  </button>
+                </div>
             </div>
           </div>
-        ))}
+        );
+        })}
       </div>
 
       {/* Confirmation Modal */}
