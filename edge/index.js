@@ -4,7 +4,10 @@ import { handleWorksRequest } from "./works.js";
 
 async function handleRequest(request) {
   const url = new URL(request.url);
-  const pathname = url.pathname;
+  let pathname = url.pathname;
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    pathname = pathname.replace(/\/+$/, "");
+  }
 
   if (pathname.endsWith("/api/health")) {
     return jsonResponse(
