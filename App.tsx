@@ -142,6 +142,11 @@ function AppInner() {
   };
 
   const handleSelectWork = (id: string) => {
+    if (!authUser) {
+      setIsAuthPanelOpen(true);
+      setAuthError("请先登录后再打开作品");
+      return;
+    }
     setError(null);
     setIsChatOpen(false);
     const work = works.find(w => w.id === id);
