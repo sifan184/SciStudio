@@ -93,25 +93,27 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
                 </p>
             </div>
             
-            <div className="mt-auto pt-4 border-t border-slate-800 flex items-center justify-between">
-                <span className="text-xs text-slate-600 font-mono">
-                    {t.created}: {new Date(work.createdAt).toLocaleDateString()}
+            <div className="mt-auto pt-4 border-t border-slate-800 flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0 text-xs text-slate-600 font-mono leading-5 pr-4">
+                    <div>
+                        {t.created}: {new Date(work.createdAt).toLocaleDateString()}
+                    </div>
                     {work.ownerEmail && (
-                      <span className="ml-2">
+                      <div className="mt-1">
                         {t.creator}: {maskEmail(work.ownerEmail)}
-                      </span>
+                      </div>
                     )}
-                </span>
-                <div className="flex items-center gap-2">
+                </div>
+                <div className="flex-shrink-0 flex items-center gap-2">
                   <button 
                     onClick={() => onDuplicate(work.id)}
-                    className="text-sm bg-slate-900 hover:bg-slate-800 text-slate-200 px-3 py-2 rounded-lg transition-colors border border-slate-700 hover:border-slate-600"
+                    className="text-sm bg-slate-900 hover:bg-slate-800 text-slate-200 px-3 py-2 rounded-lg transition-colors border border-slate-700 hover:border-slate-600 whitespace-nowrap"
                   >
                     {t.duplicate}
                   </button>
                   <button 
                     onClick={() => onSelect(work.id)}
-                    className="text-sm bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 hover:border-slate-600"
+                    className="text-sm bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition-colors border border-slate-700 hover:border-slate-600 whitespace-nowrap"
                   >
                     {t.open}
                   </button>
