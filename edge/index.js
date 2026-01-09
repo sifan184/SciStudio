@@ -1,25 +1,77 @@
-import { createClient } from "@supabase/supabase-js";
+import OSS from "ali-oss";
 
 const EDGE_KV_NAMESPACE = "SciStudio";
+const OSS_BUCKET_NAME = "scistudio";
 let ESA_ENV = null;
 
 const SESSION_COOKIE_NAME = "scistudio_session";
 const WORKS_INDEX_KEY = "works_index";
 
-function getSupabaseClient() {
+function getOssClient() {
   if (!ESA_ENV || typeof ESA_ENV !== "object") {
-    throw new Error("Supabase env not available");
+    throw new Error("OSS env not available");
   }
-  const url = ESA_ENV.SUPABASE_URL;
-  const serviceKey = ESA_ENV.SUPABASE_SERVICE_ROLE_KEY || ESA_ENV.SUPABASE_ANON_KEY;
-  if (!url || !serviceKey) {
-    throw new Error("Supabase credentials not configured");
+  const region = ESA_ENV.OSS_REGION;
+  const accessKeyId = ESA_ENV.OSS_ACCESS_KEY_ID;
+  const accessKeySecret = ESA_ENV.OSS_ACCESS_KEY_SECRET;
+  const bucket = ESA_ENV.OSS_BUCKET || OSS_BUCKET_NAME;
+  if (!region || !accessKeyId || !accessKeySecret) {
+    throw new Error("OSS credentials not configured");
   }
-  return createClient(url, serviceKey, {
-    auth: {
-      persistSession: false
+  return new OSS({
+    region,
+    accessKeyId,
+    accessKeySecret,
+    bucket
+  });
+}
+
+async function saveWorkRecordToOss(record) {
+  const client = getOssClient();
+  const key = `${record.id}.json`;
+  const body = JSON.stringify(record);
+  await client.put(key, body, {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8"
     }
   });
+}
+
+async function loadWorkRecordFromOss(workId) {
+  const client = getOssClient();
+  const key = `${workId}.json`;
+  try {
+    const result = await client.get(key);
+    const body = result.content;
+    let text;
+    if (typeof body === "string") {
+      text = body;
+    } else if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+      const decoder = new TextDecoder("utf-8");
+      text = decoder.decode(body);
+    } else {
+      text = String(body);
+    }
+    return JSON.parse(text);
+  } catch (e) {
+    if (e && e.code === "NoSuchKey") {
+      return null;
+    }
+    throw e;
+  }
+}
+
+async function deleteWorkRecordFromOss(workId) {
+  const client = getOssClient();
+  const key = `${workId}.json`;
+  try {
+    await client.delete(key);
+  } catch (e) {
+    if (e && e.code === "NoSuchKey") {
+      return;
+    }
+    throw e;
+  }
 }
 
 function normalizeEmail(email) {
@@ -307,20 +359,15 @@ async function handleWorkCreate(request) {
   const now = Date.now();
   const workId = generateId("w_");
   const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
-  const supabase = getSupabaseClient();
 
   let artifact = baseArtifact;
   let messages = null;
 
   if (!artifact && sourceWorkId) {
-    const { data, error } = await supabase
-      .from("works")
-      .select("artifact,messages,title,description,created_at")
-      .eq("id", sourceWorkId)
-      .maybeSingle();
-    if (!error && data && data.artifact) {
-      artifact = data.artifact;
-      messages = data.messages || null;
+    const sourceRecord = await loadWorkRecordFromOss(sourceWorkId);
+    if (sourceRecord && sourceRecord.artifact) {
+      artifact = sourceRecord.artifact;
+      messages = sourceRecord.messages || null;
     }
   }
 
@@ -344,21 +391,21 @@ async function handleWorkCreate(request) {
     };
   }
 
-  const supabasePayload = {
+  const record = {
     id: workId,
-    user_id: user.id,
-    owner_email: user.email ?? null,
-    title: artifact.title,
-    description: artifact.description,
-    code: artifact.code,
-    created_at: new Date(now).toISOString(),
-    updated_at: new Date(now).toISOString(),
+    userId: user.id,
+    ownerEmail: user.email ?? null,
     artifact,
     messages
   };
 
-  const { error: insertError } = await supabase.from("works").insert(supabasePayload);
-  if (insertError) {
+  try {
+    await saveWorkRecordToOss({
+      ...record,
+      createdAt: now,
+      updatedAt: now
+    });
+  } catch (e) {
     return jsonResponse(
       {
         error: "创建作品失败"
@@ -468,13 +515,8 @@ async function handleSignup(request) {
 }
 
 async function handleWorkGet(request, workId) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from("works")
-    .select("id,user_id,owner_email,title,description,code,artifact,created_at,updated_at,messages")
-    .eq("id", workId)
-    .maybeSingle();
-  if (error || !data) {
+  const record = await loadWorkRecordFromOss(workId);
+  if (!record || !record.artifact) {
     return jsonResponse(
       {
         error: "作品不存在"
@@ -482,28 +524,24 @@ async function handleWorkGet(request, workId) {
       404
     );
   }
-  const createdAt = data.artifact && typeof data.artifact.createdAt === "number" ? data.artifact.createdAt : Date.parse(data.created_at || "") || Date.now();
-  const artifact = data.artifact && typeof data.artifact === "object"
-    ? {
-        ...data.artifact,
-        id: data.id,
-        ownerId: data.user_id,
-        ownerEmail: data.owner_email ?? null,
-        createdAt
-      }
-    : {
-        id: data.id,
-        createdAt,
-        title: data.title || "",
-        description: data.description || "",
-        code: data.code || "",
-        ownerId: data.user_id,
-        ownerEmail: data.owner_email ?? null
-      };
+  const baseArtifact = record.artifact && typeof record.artifact === "object" ? record.artifact : {};
+  const createdAt =
+    typeof baseArtifact.createdAt === "number"
+      ? baseArtifact.createdAt
+      : typeof record.createdAt === "number"
+      ? record.createdAt
+      : Date.now();
+  const artifact = {
+    ...baseArtifact,
+    id: record.id,
+    ownerId: record.userId,
+    ownerEmail: record.ownerEmail ?? null,
+    createdAt
+  };
   return jsonResponse(
     {
       work: artifact,
-      messages: data.messages || []
+      messages: Array.isArray(record.messages) ? record.messages : []
     },
     200
   );
@@ -540,18 +578,28 @@ async function handleWorkUpdate(request, workId) {
       400
     );
   }
-  const supabase = getSupabaseClient();
-  const nowIso = new Date().toISOString();
-  const updatePayload = {
-    title: artifact.title,
-    description: artifact.description,
-    code: artifact.code,
-    updated_at: nowIso,
+  const existing = await loadWorkRecordFromOss(workId);
+  if (!existing) {
+    return jsonResponse(
+      {
+        error: "作品不存在"
+      },
+      404
+    );
+  }
+  const now = Date.now();
+  const updatedRecord = {
+    id: workId,
+    userId: existing.userId,
+    ownerEmail: existing.ownerEmail ?? user.email ?? null,
+    createdAt: typeof existing.createdAt === "number" ? existing.createdAt : now,
+    updatedAt: now,
     artifact,
     messages
   };
-  const { error } = await supabase.from("works").update(updatePayload).eq("id", workId);
-  if (error) {
+  try {
+    await saveWorkRecordToOss(updatedRecord);
+  } catch (e) {
     return jsonResponse(
       {
         error: "更新作品失败"
@@ -698,8 +746,7 @@ async function handleWorkDelete(request, workId) {
       403
     );
   }
-  const supabase = getSupabaseClient();
-  await supabase.from("works").delete().eq("id", workId);
+  await deleteWorkRecordFromOss(workId);
 
   let list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
   if (Array.isArray(list)) {
