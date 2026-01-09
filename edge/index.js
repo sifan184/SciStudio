@@ -263,9 +263,10 @@ async function handleSignup(request) {
     }
   );
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     return jsonResponse(
       {
-        error: "注册失败，请稍后重试"
+        error: `注册失败，请稍后重试：${message}`
       },
       500
     );
@@ -337,9 +338,10 @@ async function handleLogin(request) {
     }
   );
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     return jsonResponse(
       {
-        error: "登录失败，请稍后重试"
+        error: `登录失败，请稍后重试：${message}`
       },
       500
     );
