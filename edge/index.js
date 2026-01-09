@@ -1,179 +1,131 @@
 const EDGE_KV_NAMESPACE = "947407923057872896";
 let ESA_ENV = null;
 
-function getEnvVar(name, viteName) {
-  let value = "";
-  if (ESA_ENV && typeof ESA_ENV === "object") {
-    value = ESA_ENV[name] || ESA_ENV[viteName] || "";
-    if (value) {
-      return value;
-    }
-  }
-  if (typeof process !== "undefined" && process && process.env) {
-    value = process.env[name] || process.env[viteName] || "";
-    if (value) {
-      return value;
-    }
-  }
-  if (typeof globalThis === "object" && globalThis) {
-    const g = globalThis;
-    const env = g.ENV || {};
-    value =
-      (env && (env[name] || env[viteName])) ||
-      g[name] ||
-      g[viteName] ||
-      "";
-  }
-  return value;
+const SESSION_COOKIE_NAME = "scistudio_session";
+
+function normalizeEmail(email) {
+  return email.trim().toLowerCase();
 }
 
-function maskString(value) {
-  if (typeof value !== "string") {
-    return null;
+function generateId(prefix) {
+  const random = Math.random().toString(36).slice(2, 10);
+  const time = Date.now().toString(36);
+  return `${prefix}${time}_${random}`;
+}
+
+function parseCookies(request) {
+  const header = request.headers.get("cookie") || "";
+  const cookies = {};
+  if (!header) {
+    return cookies;
   }
+  const parts = header.split(";");
+  for (const part of parts) {
+    const [rawName, ...rest] = part.split("=");
+    if (!rawName) continue;
+    const name = rawName.trim();
+    const value = rest.join("=").trim();
+    if (!name) continue;
+    cookies[name] = value;
+  }
+  return cookies;
+}
+
+function getSessionIdFromRequest(request) {
+  const cookies = parseCookies(request);
+  const value = cookies[SESSION_COOKIE_NAME];
   if (!value) {
     return "";
   }
-  if (value.length <= 8) {
-    return value;
-  }
-  const head = value.slice(0, 4);
-  const tail = value.slice(-4);
-  return head + "..." + tail;
+  return decodeURIComponent(value);
 }
 
-function sanitizeEnvObject(obj) {
-  if (!obj || typeof obj !== "object") {
-    return null;
-  }
-  const result = {};
-  for (const key of Object.keys(obj)) {
-    const raw = obj[key];
-    if (typeof raw === "string") {
-      result[key] = {
-        type: "string",
-        length: raw.length,
-        preview: maskString(raw)
-      };
-    } else {
-      result[key] = {
-        type: typeof raw
-      };
-    }
-  }
-  return result;
+function buildSessionCookie(sessionId) {
+  const maxAgeSeconds = 60 * 60 * 24 * 30;
+  const encoded = encodeURIComponent(sessionId);
+  return `${SESSION_COOKIE_NAME}=${encoded}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
 }
 
-function buildEnvDebugSnapshot() {
-  const snapshot = {};
-
-  snapshot.esaEnvKeys =
-    ESA_ENV && typeof ESA_ENV === "object" ? Object.keys(ESA_ENV) : [];
-  snapshot.esaEnv = sanitizeEnvObject(ESA_ENV);
-
-  if (typeof process !== "undefined" && process && process.env) {
-    snapshot.processEnvKeys = Object.keys(process.env);
-    snapshot.processEnv = sanitizeEnvObject(process.env);
-  } else {
-    snapshot.processEnvKeys = [];
-    snapshot.processEnv = null;
-  }
-
-  if (typeof globalThis === "object" && globalThis) {
-    const g = globalThis;
-    const env = g.ENV || {};
-    snapshot.globalEnvKeys =
-      env && typeof env === "object" ? Object.keys(env) : [];
-    snapshot.globalEnv = sanitizeEnvObject(env);
-  } else {
-    snapshot.globalEnvKeys = [];
-    snapshot.globalEnv = null;
-  }
-
-  const supabaseUrlFromEnv = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL");
-  const supabaseAnonFromEnv = getEnvVar(
-    "SUPABASE_ANON_KEY",
-    "VITE_SUPABASE_ANON_KEY"
-  );
-
-  snapshot.supabase = {
-    resolvedUrl: supabaseUrlFromEnv || null,
-    resolvedAnonKeyPresent: !!supabaseAnonFromEnv,
-    resolvedAnonKeyPreview: maskString(supabaseAnonFromEnv || ""),
-    sources: {
-      esaEnv: {
-        url:
-          ESA_ENV && typeof ESA_ENV === "object"
-            ? ESA_ENV.SUPABASE_URL || ESA_ENV.VITE_SUPABASE_URL || ""
-            : "",
-        anonKeyPreview:
-          ESA_ENV && typeof ESA_ENV === "object"
-            ? maskString(
-                ESA_ENV.SUPABASE_ANON_KEY ||
-                  ESA_ENV.VITE_SUPABASE_ANON_KEY ||
-                  ""
-              )
-            : ""
-      },
-      processEnv: typeof process !== "undefined" && process && process.env
-        ? {
-            url:
-              process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
-            anonKeyPreview: maskString(
-              process.env.SUPABASE_ANON_KEY ||
-                process.env.VITE_SUPABASE_ANON_KEY ||
-                ""
-            )
-          }
-        : null,
-      globalEnv:
-        typeof globalThis === "object" && globalThis && globalThis.ENV
-          ? {
-              url:
-                globalThis.ENV.SUPABASE_URL ||
-                globalThis.ENV.VITE_SUPABASE_URL ||
-                "",
-              anonKeyPreview: maskString(
-                globalThis.ENV.SUPABASE_ANON_KEY ||
-                  globalThis.ENV.VITE_SUPABASE_ANON_KEY ||
-                  ""
-              )
-            }
-          : null
-    }
-  };
-
-  return snapshot;
+function buildClearSessionCookie() {
+  return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
 
-async function getSupabaseClient() {
+async function hashPassword(password) {
   try {
-    const url = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL");
-    const key = getEnvVar("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY");
-
-    if (!url || !key) {
-      return null;
+    if (globalThis.crypto && crypto.subtle && typeof crypto.subtle.digest === "function") {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const digest = await crypto.subtle.digest("SHA-256", data);
+      const bytes = new Uint8Array(digest);
+      let hex = "";
+      for (let i = 0; i < bytes.length; i++) {
+        hex += bytes[i].toString(16).padStart(2, "0");
+      }
+      return hex;
     }
+  } catch {
+  }
+  let hash = 0;
+  for (let i = 0; i < password.length; i++) {
+    const chr = password.charCodeAt(i);
+    hash = (hash << 5) - hash + chr;
+    hash |= 0;
+  }
+  return hash.toString(16);
+}
 
-    const mod = await import("@supabase/supabase-js");
-    const createClient = mod.createClient || (mod.default && mod.default.createClient);
-    if (typeof createClient !== "function") {
-      return null;
-    }
-    return createClient(url, key);
-  } catch (e) {
-    console.error("Supabase client init error:", e);
+async function createSession(userId) {
+  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const sessionId = generateId("s_");
+  const now = Date.now();
+  const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
+  const session = {
+    id: sessionId,
+    userId,
+    createdAt: now,
+    expiresAt
+  };
+  await edgeKV.put(`session_${sessionId}`, JSON.stringify(session));
+  return sessionId;
+}
+
+async function getUserFromSession(sessionId) {
+  if (!sessionId) {
     return null;
   }
+  try {
+    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const session = await edgeKV.get(`session_${sessionId}`, { type: "json" });
+    if (!session || typeof session !== "object") {
+      return null;
+    }
+    if (typeof session.expiresAt === "number" && Date.now() > session.expiresAt) {
+      return null;
+    }
+    const user = await edgeKV.get(`user_${session.userId}`, { type: "json" });
+    if (!user || typeof user !== "object") {
+      return null;
+    }
+    return {
+      id: user.id,
+      email: user.email ?? null
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+async function getUserFromRequest(request) {
+  const sessionId = getSessionIdFromRequest(request);
+  if (!sessionId) {
+    return null;
+  }
+  return getUserFromSession(sessionId);
 }
 
 async function handleRequest(request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
-
-  if (pathname.endsWith("/api/debug/env")) {
-    return handleEnvDebug(request);
-  }
 
   if (pathname.endsWith("/api/health")) {
     return jsonResponse(
@@ -196,6 +148,29 @@ async function handleRequest(request) {
 }
 
 async function handleAuthRequest(request, url) {
+  let path = url.pathname;
+  if (path.length > 1 && path.endsWith("/")) {
+    path = path.replace(/\/+$/, "");
+  }
+
+  if (path.endsWith("/api/auth/user")) {
+    if (request.method !== "GET") {
+      return jsonResponse(
+        {
+          error: "仅支持 GET 请求"
+        },
+        405
+      );
+    }
+    const user = await getUserFromRequest(request);
+    return jsonResponse(
+      {
+        user: user
+      },
+      200
+    );
+  }
+
   if (request.method !== "POST") {
     return jsonResponse(
       {
@@ -205,41 +180,16 @@ async function handleAuthRequest(request, url) {
     );
   }
 
-  let path = url.pathname;
-  if (path.length > 1 && path.endsWith("/")) {
-    path = path.replace(/\/+$/, "");
-  }
-
-  if (path.endsWith("/api/auth/user")) {
-    return jsonResponse(
-      {
-        user: null
-      },
-      200
-    );
-  }
-
-  const supabase = await getSupabaseClient();
-
-  if (!supabase) {
-    return jsonResponse(
-      {
-        error: "Supabase 未配置，请在 ESA 环境变量中设置 SUPABASE_URL 和 SUPABASE_ANON_KEY"
-      },
-      500
-    );
-  }
-
   if (path.endsWith("/api/auth/signup")) {
-    return handleSignup(request, supabase);
+    return handleSignup(request);
   }
 
   if (path.endsWith("/api/auth/login")) {
-    return handleLogin(request, supabase);
+    return handleLogin(request);
   }
 
   if (path.endsWith("/api/auth/logout")) {
-    return handleLogout();
+    return handleLogout(request);
   }
 
   return jsonResponse(
@@ -248,21 +198,6 @@ async function handleAuthRequest(request, url) {
     },
     404
   );
-}
-
-async function handleEnvDebug(request) {
-  if (request.method !== "GET") {
-    return jsonResponse(
-      {
-        error: "仅支持 GET 请求"
-      },
-      405
-    );
-  }
-
-  const snapshot = buildEnvDebugSnapshot();
-
-  return jsonResponse(snapshot, 200);
 }
 
 async function parseJsonBody(request) {
@@ -277,7 +212,7 @@ async function parseJsonBody(request) {
   }
 }
 
-async function handleSignup(request, supabase) {
+async function handleSignup(request) {
   const body = await parseJsonBody(request);
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
@@ -300,30 +235,58 @@ async function handleSignup(request, supabase) {
     );
   }
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password
-  });
+  try {
+    const normalizedEmail = normalizeEmail(email);
+    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const emailKey = `user_email_${normalizedEmail}`;
+    const existingUserId = await edgeKV.get(emailKey);
+    if (existingUserId) {
+      return jsonResponse(
+        {
+          error: "该邮箱已被注册"
+        },
+        400
+      );
+    }
 
-  if (error) {
-    return jsonResponse(
-      {
-        error: error.message
-      },
-      400
-    );
-  }
+    const userId = generateId("u_");
+    const passwordHash = await hashPassword(password);
+    const userRecord = {
+      id: userId,
+      email: normalizedEmail,
+      passwordHash,
+      createdAt: Date.now()
+    };
+
+    await edgeKV.put(`user_${userId}`, JSON.stringify(userRecord));
+    await edgeKV.put(emailKey, userId);
+
+    const sessionId = await createSession(userId);
+    const cookie = buildSessionCookie(sessionId);
 
   return jsonResponse(
     {
-      user: data.user ?? null,
-      session: data.session ?? null
+      user: {
+        id: userRecord.id,
+        email: userRecord.email
+      }
     },
-    200
+    200,
+    {
+      "Set-Cookie": cookie
+    }
   );
+  } catch (e) {
+    return jsonResponse(
+      {
+        error: "注册失败，请稍后重试"
+      },
+      500
+    );
+  }
 }
 
-async function handleLogin(request, supabase) {
+async function handleLogin(request) {
   const body = await parseJsonBody(request);
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
@@ -337,35 +300,84 @@ async function handleLogin(request, supabase) {
     );
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
+  try {
+    const normalizedEmail = normalizeEmail(email);
+    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const emailKey = `user_email_${normalizedEmail}`;
+    const userId = await edgeKV.get(emailKey);
+    if (!userId) {
+      return jsonResponse(
+        {
+          error: "邮箱或密码错误"
+        },
+        401
+      );
+    }
 
-  if (error) {
-    return jsonResponse(
-      {
-        error: error.message
-      },
-      401
-    );
-  }
+    const userRecord = await edgeKV.get(`user_${userId}`, { type: "json" });
+    if (!userRecord || typeof userRecord !== "object") {
+      return jsonResponse(
+        {
+          error: "邮箱或密码错误"
+        },
+        401
+      );
+    }
+
+    const storedHash = userRecord.passwordHash;
+    const currentHash = await hashPassword(password);
+    if (!storedHash || storedHash !== currentHash) {
+      return jsonResponse(
+        {
+          error: "邮箱或密码错误"
+        },
+        401
+      );
+    }
+
+    const sessionId = await createSession(userRecord.id);
+    const cookie = buildSessionCookie(sessionId);
 
   return jsonResponse(
     {
-      user: data.user ?? null,
-      session: data.session ?? null
+      user: {
+        id: userRecord.id,
+        email: userRecord.email ?? null
+      }
     },
-    200
+    200,
+    {
+      "Set-Cookie": cookie
+    }
   );
+  } catch (e) {
+    return jsonResponse(
+      {
+        error: "登录失败，请稍后重试"
+      },
+      500
+    );
+  }
 }
 
-async function handleLogout() {
+async function handleLogout(request) {
+  const sessionId = getSessionIdFromRequest(request);
+  if (sessionId) {
+    try {
+      const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+      await edgeKV.put(`session_${sessionId}`, "", {});
+    } catch (e) {
+    }
+  }
+  const cookie = buildClearSessionCookie();
   return jsonResponse(
     {
       ok: true
     },
-    200
+    200,
+    {
+      "Set-Cookie": cookie
+    }
   );
 }
 
@@ -472,12 +484,19 @@ async function handleCloudSnapshotPost(request) {
   }
 }
 
-function jsonResponse(body, status) {
+function jsonResponse(body, status, extraHeaders) {
+  const baseHeaders = {
+    "content-type": "application/json; charset=utf-8"
+  };
+  const headers = extraHeaders
+    ? {
+        ...baseHeaders,
+        ...extraHeaders
+      }
+    : baseHeaders;
   return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      "content-type": "application/json; charset=utf-8"
-    }
+    headers
   });
 }
 
