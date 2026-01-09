@@ -65,7 +65,10 @@ async function handleAuthRequest(request, url) {
     );
   }
 
-  const path = url.pathname;
+  let path = url.pathname;
+  if (path.length > 1 && path.endsWith("/")) {
+    path = path.replace(/\/+$/, "");
+  }
 
   if (path.endsWith("/api/auth/signup")) {
     return handleSignup(request, supabase);
