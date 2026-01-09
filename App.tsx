@@ -55,6 +55,10 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
 }
 
 function AppInner() {
+  interface AuthUser {
+    id: string;
+    email: string | null;
+  }
   // Global State
   const [works, setWorks] = useState<ScienceArtifact[]>(() => {
     if (typeof window === 'undefined') {
@@ -97,7 +101,15 @@ function AppInner() {
       return {};
     }
   });
-  
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
+
   // Model State
   const [models, setModels] = useState<ModelConfig[]>(() => {
     if (typeof window === 'undefined') {
@@ -189,9 +201,38 @@ function AppInner() {
 
   useEffect(() => {
     let cancelled = false;
+    const loadUser = async () => {
+      try {
+        const res = await fetch("/api/auth/user", {
+          credentials: "include"
+        });
+        if (!res.ok) {
+          return;
+        }
+        const json = await res.json();
+        if (!cancelled) {
+          setAuthUser(json.user ?? null);
+        }
+      } catch {
+      } finally {
+        if (!cancelled) {
+          setAuthLoading(false);
+        }
+      }
+    };
+    loadUser();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!authUser) return;
+    let cancelled = false;
     const load = async () => {
       try {
-        const snapshot = await loadCloudSnapshot();
+        const snapshot = await loadCloudSnapshot(authUser.id);
         if (!snapshot || cancelled) return;
         if (snapshot.works && snapshot.works.length > 0) {
           setWorks(migrateWorks(snapshot.works));
@@ -225,7 +266,79 @@ function AppInner() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authUser, authLoading]);
+
+  const handleAuthSubmit = async () => {
+    setAuthError(null);
+    try {
+      const endpoint = authMode === "signup" ? "/api/auth/signup" : "/api/auth/login";
+      if (authMode === "signup" && authPassword !== authPasswordConfirm) {
+        setAuthError("两次输入的密码不一致");
+        return;
+      }
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email: authEmail,
+          password: authPassword
+        })
+      });
+      const text = await res.text().catch(() => "");
+      let data: any = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = null;
+        }
+      }
+      if (!res.ok) {
+        const messageFromJson =
+          data && typeof data === "object" && typeof (data as any).error === "string"
+            ? (data as any).error
+            : null;
+        const fallback = res.status
+          ? `认证服务异常（HTTP ${res.status}），请稍后重试`
+          : "认证失败，请稍后重试";
+        const finalMessage = messageFromJson || fallback;
+        setAuthError(finalMessage);
+        if (!messageFromJson && text) {
+          console.error("Auth error response:", res.status, text);
+        }
+        return;
+      }
+      const user =
+        data && typeof data === "object" && "user" in data
+          ? (data as any).user
+          : null;
+      setAuthUser(user ?? null);
+      setIsAuthPanelOpen(false);
+      setAuthEmail("");
+      setAuthPassword("");
+      setAuthPasswordConfirm("");
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setAuthError(message);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setAuthError(null);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include"
+      });
+      setAuthUser(null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setAuthError(message);
+    }
+  };
 
   const handleRuntimeError = (message: string) => {
     if (!activeWork) return;
@@ -459,13 +572,14 @@ function AppInner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!authUser) return;
     const persist = async () => {
       try {
         const modelsWithoutKeys = models.map(m => {
           const { apiKey, ...rest } = m;
           return rest;
         });
-        await saveCloudSnapshot({
+        await saveCloudSnapshot(authUser.id, {
           works,
           messagesMap,
           selectedModelId,
@@ -476,7 +590,7 @@ function AppInner() {
       }
     };
     persist();
-  }, [works, messagesMap, selectedModelId, models]);
+  }, [authUser, works, messagesMap, selectedModelId, models]);
 
   // --- Resize Handlers ---
   const startResizing = useCallback((e: React.MouseEvent) => {
@@ -533,7 +647,104 @@ function AppInner() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3"></div>
+        <div className="flex items-center gap-3 relative">
+          {authUser ? (
+              <>
+                <span className="text-xs text-slate-300 max-w-[140px] truncate">
+                  {authUser.email}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  disabled={authLoading}
+                  className="px-3 py-1 rounded-full text-xs bg-slate-800 text-slate-100 hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  退出登录
+                </button>
+              </>
+            ) : (
+            <>
+              <button
+                onClick={() => {
+                  setIsAuthPanelOpen(v => !v);
+                  setAuthError(null);
+                }}
+                className="px-3 py-1 rounded-full text-xs bg-brand-600 text-white hover:bg-brand-500"
+              >
+                登录 / 注册
+              </button>
+              {isAuthPanelOpen && (
+                <div className="absolute right-0 top-10 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-4 z-30">
+                  <div className="flex mb-3 text-xs bg-slate-800 rounded-full overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setAuthMode("login");
+                        setAuthError(null);
+                      }}
+                      className={`flex-1 py-1.5 ${authMode === "login" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+                    >
+                      登录
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAuthMode("signup");
+                        setAuthError(null);
+                      }}
+                      className={`flex-1 py-1.5 ${authMode === "signup" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+                    >
+                      注册
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-slate-300">邮箱</div>
+                      <input
+                        type="email"
+                        value={authEmail}
+                        onChange={e => setAuthEmail(e.target.value)}
+                        className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-slate-300">密码</div>
+                      <input
+                        type="password"
+                        value={authPassword}
+                        onChange={e => setAuthPassword(e.target.value)}
+                        className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
+                        placeholder="至少 6 位"
+                      />
+                    </div>
+                    {authMode === "signup" && (
+                      <div className="space-y-1">
+                        <div className="text-[11px] text-slate-300">确认密码</div>
+                        <input
+                          type="password"
+                          value={authPasswordConfirm}
+                          onChange={e => setAuthPasswordConfirm(e.target.value)}
+                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
+                          placeholder="再次输入密码"
+                        />
+                      </div>
+                    )}
+                    {authError && (
+                      <div className="text-[11px] text-red-400">
+                        {authError}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleAuthSubmit}
+                      disabled={authLoading || !authEmail || !authPassword}
+                      className="w-full mt-1 px-3 py-1.5 rounded-md text-xs bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {authMode === "login" ? "登录" : "注册"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </header>
 
       {/* Main Layout Area */}

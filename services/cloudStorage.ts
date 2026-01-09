@@ -1,11 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
 import { ScienceArtifact, ChatMessage, ModelConfig } from "../types";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-const bucketName = "scistudio";
-const publicProfilePath = "profiles/public.json";
 
 interface CloudSnapshot {
   works: ScienceArtifact[];
@@ -14,32 +7,44 @@ interface CloudSnapshot {
   modelsWithoutKeys: Omit<ModelConfig, "apiKey">[];
 }
 
-const supabase =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
-
-export const loadCloudSnapshot = async (): Promise<CloudSnapshot | null> => {
-  if (!supabase) return null;
-  const { data, error } = await supabase.storage.from(bucketName).download(publicProfilePath);
-  if (error || !data) {
-    return null;
-  }
-  const text = await data.text();
+export const loadCloudSnapshot = async (userId: string | null): Promise<CloudSnapshot | null> => {
+  if (!userId) return null;
   try {
-    const parsed = JSON.parse(text) as CloudSnapshot;
-    return parsed;
+    const params = new URLSearchParams({ userId });
+    const res = await fetch(`/api/cloud/snapshot?${params.toString()}`, {
+      method: "GET",
+      credentials: "include"
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const json = await res.json().catch(() => null);
+    if (!json || typeof json !== "object") {
+      return null;
+    }
+    if (!("snapshot" in json) || json.snapshot == null) {
+      return null;
+    }
+    return json.snapshot as CloudSnapshot;
   } catch {
     return null;
   }
 };
 
-export const saveCloudSnapshot = async (snapshot: CloudSnapshot): Promise<void> => {
-  if (!supabase) return;
-  const json = JSON.stringify(snapshot);
-  const blob = new Blob([json], { type: "application/json" });
-
-  await supabase.storage.from(bucketName).upload(publicProfilePath, blob, {
-    upsert: true
-  });
+export const saveCloudSnapshot = async (userId: string | null, snapshot: CloudSnapshot): Promise<void> => {
+  if (!userId) return;
+  try {
+    await fetch("/api/cloud/snapshot", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        userId,
+        snapshot
+      })
+    });
+  } catch {
+  }
 };

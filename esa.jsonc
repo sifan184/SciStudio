@@ -1,5 +1,6 @@
 {
   "name": "scistudio-ai",
+  "entry": "./edge/index.js",
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "assets": {
