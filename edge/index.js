@@ -225,7 +225,7 @@ async function handleSignup(request) {
     const normalizedEmail = normalizeEmail(email);
     const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
     const emailKey = `user_email_${normalizedEmail}`;
-    const existingUserId = await edgeKV.get(emailKey);
+    const existingUserId = await edgeKV.get(emailKey, { type: "text" });
     if (existingUserId) {
       return jsonResponse(
         {
@@ -291,7 +291,7 @@ async function handleLogin(request) {
     const normalizedEmail = normalizeEmail(email);
     const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
     const emailKey = `user_email_${normalizedEmail}`;
-    const userId = await edgeKV.get(emailKey);
+    const userId = await edgeKV.get(emailKey, { type: "text" });
     if (!userId) {
       return jsonResponse(
         {
