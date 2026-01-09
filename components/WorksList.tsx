@@ -96,7 +96,7 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
             <div className="mt-auto pt-4 border-t border-slate-800 flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0 text-xs text-slate-600 font-mono leading-5 pr-4">
                     <div>
-                        {t.created}: {new Date(work.createdAt).toLocaleDateString()}
+                        {t.created}: {new Date(work.createdAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </div>
                     {work.ownerEmail && (
                       <div className="mt-1">
