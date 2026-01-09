@@ -2,21 +2,33 @@ const EDGE_KV_NAMESPACE = "947407923057872896";
 
 async function getSupabaseClient() {
   try {
-    const env =
-      (typeof process !== "undefined" && process && process.env) ||
-      (typeof globalThis === "object" && globalThis && (globalThis.ENV || globalThis)) ||
-      {};
-    const url =
-      env.SUPABASE_URL ||
-      env.VITE_SUPABASE_URL ||
-      "";
-    const key =
-      env.SUPABASE_ANON_KEY ||
-      env.VITE_SUPABASE_ANON_KEY ||
-      "";
+    const getVar = (name, viteName) => {
+      let value = "";
+      if (typeof process !== "undefined" && process && process.env) {
+        value = process.env[name] || process.env[viteName] || "";
+        if (value) {
+          return value;
+        }
+      }
+      if (typeof globalThis === "object" && globalThis) {
+        const g = globalThis;
+        const env = g.ENV || {};
+        value =
+          (env && (env[name] || env[viteName])) ||
+          g[name] ||
+          g[viteName] ||
+          "";
+      }
+      return value;
+    };
+
+    const url = getVar("SUPABASE_URL", "VITE_SUPABASE_URL");
+    const key = getVar("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY");
+
     if (!url || !key) {
       return null;
     }
+
     const mod = await import("@supabase/supabase-js");
     const createClient = mod.createClient || (mod.default && mod.default.createClient);
     if (typeof createClient !== "function") {
