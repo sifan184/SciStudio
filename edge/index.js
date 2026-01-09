@@ -1,14 +1,19 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-const supabase =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
-
 const EDGE_KV_NAMESPACE = "947407923057872896";
+
+function getSupabaseClient() {
+  try {
+    const url = (globalThis as any).SUPABASE_URL || "";
+    const key = (globalThis as any).SUPABASE_ANON_KEY || "";
+    if (!url || !key) {
+      return null;
+    }
+    return createClient(url, key);
+  } catch {
+    return null;
+  }
+}
 
 async function handleRequest(request) {
   const url = new URL(request.url);
@@ -35,6 +40,8 @@ async function handleRequest(request) {
 }
 
 async function handleAuthRequest(request, url) {
+  const supabase = getSupabaseClient();
+
   if (!supabase) {
     return jsonResponse(
       {
@@ -56,11 +63,11 @@ async function handleAuthRequest(request, url) {
   const path = url.pathname;
 
   if (path.endsWith("/api/auth/signup")) {
-    return handleSignup(request);
+    return handleSignup(request, supabase);
   }
 
   if (path.endsWith("/api/auth/login")) {
-    return handleLogin(request);
+    return handleLogin(request, supabase);
   }
 
   if (path.endsWith("/api/auth/logout")) {
@@ -87,7 +94,7 @@ async function parseJsonBody(request) {
   }
 }
 
-async function handleSignup(request) {
+async function handleSignup(request, supabase) {
   const body = await parseJsonBody(request);
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
@@ -133,7 +140,7 @@ async function handleSignup(request) {
   );
 }
 
-async function handleLogin(request) {
+async function handleLogin(request, supabase) {
   const body = await parseJsonBody(request);
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
