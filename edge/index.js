@@ -1,4 +1,4 @@
-const EDGE_KV_NAMESPACE = "947407923057872896";
+const EDGE_KV_NAMESPACE = "SciStudio";
 let ESA_ENV = null;
 
 const SESSION_COOKIE_NAME = "scistudio_session";
