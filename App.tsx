@@ -5,7 +5,6 @@ import { ArtifactRenderer } from './components/ArtifactRenderer';
 import { ChatInterface } from './components/ChatInterface';
 import { WorksList } from './components/WorksList';
 import { generateScienceArtifact } from './services/geminiService';
-import { loadCloudSnapshot } from './services/cloudStorage';
 import * as Lucide from 'lucide-react';
 
 const migrateWorks = (works: ScienceArtifact[]): ScienceArtifact[] => {
@@ -316,48 +315,6 @@ function AppInner() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!authUser) return;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const snapshot = await loadCloudSnapshot(authUser.id);
-        if (!snapshot || cancelled) return;
-        if (snapshot.works && snapshot.works.length > 0) {
-          setWorks(migrateWorks(snapshot.works));
-        }
-        if (snapshot.messagesMap) {
-          setMessagesMap(snapshot.messagesMap);
-        }
-        if (typeof snapshot.selectedModelId === "string" && snapshot.selectedModelId.length > 0) {
-          setSelectedModelId(snapshot.selectedModelId);
-        }
-        if (snapshot.modelsWithoutKeys && snapshot.modelsWithoutKeys.length > 0) {
-          setModels(prev => {
-            const byId: Record<string, ModelConfig> = {};
-            prev.forEach(m => {
-              byId[m.id] = m;
-            });
-            return snapshot.modelsWithoutKeys.map(m => {
-              const existing = byId[m.id];
-              if (existing && existing.apiKey) {
-                return { ...m, apiKey: existing.apiKey };
-              }
-              return m;
-            });
-          });
-        }
-      } catch (e) {
-        console.error("Load cloud snapshot error:", e);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [authUser, authLoading]);
 
   const handleAuthSubmit = async () => {
     setAuthError(null);

@@ -242,14 +242,27 @@ export const generateScienceArtifact = async (
 ): Promise<GenerationResponse> => {
   
   const isGlmProvider = modelConfig.provider === "Zhipu";
-  const envApiKey = isGlmProvider ? process.env.ZAI_API_KEY : process.env.API_KEY;
-  const apiKey = modelConfig.apiKey || envApiKey;
+  const env = (import.meta as any).env || {};
+  const geminiEnvKey =
+    env.VITE_GEMINI_API_KEY ||
+    env.GEMINI_API_KEY ||
+    "";
+  const glmEnvKey =
+    env.VITE_GLM_API_KEY ||
+    env.VITE_ZAI_API_KEY ||
+    env.ZAI_API_KEY ||
+    "";
+  const envApiKey = isGlmProvider ? glmEnvKey : geminiEnvKey;
+  const apiKey =
+    modelConfig.apiKey && modelConfig.apiKey.trim() !== ""
+      ? modelConfig.apiKey
+      : envApiKey;
 
   if (!apiKey || apiKey === "PLACEHOLDER_API_KEY") {
     if (isGlmProvider) {
-      throw new Error("GLM API Key 未配置或仍为占位值，请在 .env.local 设置 ZAI_API_KEY 或在模型设置中填写有效密钥。");
+      throw new Error("GLM API Key 未配置或仍为占位值，请在 .env.local 中设置 VITE_GLM_API_KEY（或 VITE_ZAI_API_KEY）或在模型设置中填写有效密钥。");
     }
-    throw new Error("Gemini API Key 未配置或仍为占位值，请在 .env.local 设置 GEMINI_API_KEY 或在模型设置中填写有效密钥。");
+    throw new Error("Gemini API Key 未配置或仍为占位值，请在 .env.local 中设置 VITE_GEMINI_API_KEY 或在模型设置中填写有效密钥。");
   }
 
   const ai = isGlmProvider ? null : new GoogleGenAI({ apiKey: apiKey });

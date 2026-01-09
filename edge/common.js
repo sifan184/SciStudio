@@ -1,5 +1,6 @@
-const EDGE_KV_NAMESPACE = "SciStudio";
-const OSS_BUCKET_NAME = "scistudio";
+let EDGE_KV_NAMESPACE = "";
+let WORKINFO_KV_NAMESPACE = "";
+let OSS_BUCKET_NAME = "";
 const SESSION_COOKIE_NAME = "scistudio_session";
 const WORKS_INDEX_KEY = "works_index";
 
@@ -7,6 +8,19 @@ let ESA_ENV = null;
 
 function setEnv(env) {
   ESA_ENV = env;
+  if (env && typeof env === "object") {
+    if (typeof env.EDGE_KV_NAMESPACE === "string" && env.EDGE_KV_NAMESPACE) {
+      EDGE_KV_NAMESPACE = env.EDGE_KV_NAMESPACE;
+    }
+    if (typeof env.WORKINFO_KV_NAMESPACE === "string" && env.WORKINFO_KV_NAMESPACE) {
+      WORKINFO_KV_NAMESPACE = env.WORKINFO_KV_NAMESPACE;
+    }
+    if (typeof env.OSS_BUCKET === "string" && env.OSS_BUCKET) {
+      OSS_BUCKET_NAME = env.OSS_BUCKET;
+    } else if (typeof env.OSS_BUCKET_NAME === "string" && env.OSS_BUCKET_NAME) {
+      OSS_BUCKET_NAME = env.OSS_BUCKET_NAME;
+    }
+  }
 }
 
 function getEnv() {
@@ -20,8 +34,8 @@ async function getOssClient() {
   const region = ESA_ENV.OSS_REGION;
   const accessKeyId = ESA_ENV.OSS_ACCESS_KEY_ID;
   const accessKeySecret = ESA_ENV.OSS_ACCESS_KEY_SECRET;
-  const bucket = ESA_ENV.OSS_BUCKET || OSS_BUCKET_NAME;
-  if (!region || !accessKeyId || !accessKeySecret) {
+  const bucket = OSS_BUCKET_NAME;
+  if (!region || !accessKeyId || !accessKeySecret || !bucket) {
     throw new Error("OSS credentials not configured");
   }
   const mod = await import("ali-oss");
@@ -47,7 +61,7 @@ async function saveWorkRecordToOss(record) {
     return;
   } catch (e) {
   }
-  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const edgeKV = new EdgeKV({ namespace: WORKINFO_KV_NAMESPACE });
   const fallbackKey = `work_${record.id}_full`;
   await edgeKV.put(fallbackKey, JSON.stringify(record));
 }
@@ -77,9 +91,13 @@ async function loadWorkRecordFromOss(workId) {
     }
   } catch (e) {
   }
-  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
   const fallbackKey = `work_${workId}_full`;
-  const text = await edgeKV.get(fallbackKey, { type: "text" });
+  const workInfoKV = new EdgeKV({ namespace: WORKINFO_KV_NAMESPACE });
+  let text = await workInfoKV.get(fallbackKey, { type: "text" });
+  if (!text) {
+    const legacyKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    text = await legacyKV.get(fallbackKey, { type: "text" });
+  }
   if (!text) {
     return null;
   }
@@ -105,10 +123,15 @@ async function deleteWorkRecordFromOss(workId) {
     }
   } catch (e) {
   }
-  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
   const fallbackKey = `work_${workId}_full`;
+  const workInfoKV = new EdgeKV({ namespace: WORKINFO_KV_NAMESPACE });
   try {
-    await edgeKV.delete(fallbackKey);
+    await workInfoKV.delete(fallbackKey);
+  } catch {
+  }
+  const legacyKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  try {
+    await legacyKV.delete(fallbackKey);
   } catch {
   }
 }
