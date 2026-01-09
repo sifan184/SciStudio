@@ -61,6 +61,10 @@ async function handleRequest(request) {
     );
   }
 
+  if (pathname.endsWith("/api/debug/env")) {
+    return handleEnvDebug();
+  }
+
   if (pathname.endsWith("/api/cloud/snapshot")) {
     return handleCloudSnapshot(request, url);
   }
@@ -137,6 +141,24 @@ async function parseJsonBody(request) {
   } catch {
     return {};
   }
+}
+
+async function handleEnvDebug() {
+  const result = {
+    ESA_ENV_keys: ESA_ENV && typeof ESA_ENV === "object" ? Object.keys(ESA_ENV) : [],
+    process_env_keys:
+      typeof process !== "undefined" && process && process.env ? Object.keys(process.env) : [],
+    global_ENV_keys:
+      typeof globalThis === "object" && globalThis && globalThis.ENV
+        ? Object.keys(globalThis.ENV)
+        : []
+  };
+  return jsonResponse(
+    {
+      env: result
+    },
+    200
+  );
 }
 
 async function handleSignup(request, supabase) {
