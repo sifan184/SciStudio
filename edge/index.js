@@ -1,36 +1,155 @@
 const EDGE_KV_NAMESPACE = "947407923057872896";
 let ESA_ENV = null;
 
+function getEnvVar(name, viteName) {
+  let value = "";
+  if (ESA_ENV && typeof ESA_ENV === "object") {
+    value = ESA_ENV[name] || ESA_ENV[viteName] || "";
+    if (value) {
+      return value;
+    }
+  }
+  if (typeof process !== "undefined" && process && process.env) {
+    value = process.env[name] || process.env[viteName] || "";
+    if (value) {
+      return value;
+    }
+  }
+  if (typeof globalThis === "object" && globalThis) {
+    const g = globalThis;
+    const env = g.ENV || {};
+    value =
+      (env && (env[name] || env[viteName])) ||
+      g[name] ||
+      g[viteName] ||
+      "";
+  }
+  return value;
+}
+
+function maskString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  if (!value) {
+    return "";
+  }
+  if (value.length <= 8) {
+    return value;
+  }
+  const head = value.slice(0, 4);
+  const tail = value.slice(-4);
+  return head + "..." + tail;
+}
+
+function sanitizeEnvObject(obj) {
+  if (!obj || typeof obj !== "object") {
+    return null;
+  }
+  const result = {};
+  for (const key of Object.keys(obj)) {
+    const raw = obj[key];
+    if (typeof raw === "string") {
+      result[key] = {
+        type: "string",
+        length: raw.length,
+        preview: maskString(raw)
+      };
+    } else {
+      result[key] = {
+        type: typeof raw
+      };
+    }
+  }
+  return result;
+}
+
+function buildEnvDebugSnapshot() {
+  const snapshot = {};
+
+  snapshot.esaEnvKeys =
+    ESA_ENV && typeof ESA_ENV === "object" ? Object.keys(ESA_ENV) : [];
+  snapshot.esaEnv = sanitizeEnvObject(ESA_ENV);
+
+  if (typeof process !== "undefined" && process && process.env) {
+    snapshot.processEnvKeys = Object.keys(process.env);
+    snapshot.processEnv = sanitizeEnvObject(process.env);
+  } else {
+    snapshot.processEnvKeys = [];
+    snapshot.processEnv = null;
+  }
+
+  if (typeof globalThis === "object" && globalThis) {
+    const g = globalThis;
+    const env = g.ENV || {};
+    snapshot.globalEnvKeys =
+      env && typeof env === "object" ? Object.keys(env) : [];
+    snapshot.globalEnv = sanitizeEnvObject(env);
+  } else {
+    snapshot.globalEnvKeys = [];
+    snapshot.globalEnv = null;
+  }
+
+  const supabaseUrlFromEnv = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL");
+  const supabaseAnonFromEnv = getEnvVar(
+    "SUPABASE_ANON_KEY",
+    "VITE_SUPABASE_ANON_KEY"
+  );
+
+  snapshot.supabase = {
+    resolvedUrl: supabaseUrlFromEnv || null,
+    resolvedAnonKeyPresent: !!supabaseAnonFromEnv,
+    resolvedAnonKeyPreview: maskString(supabaseAnonFromEnv || ""),
+    sources: {
+      esaEnv: {
+        url:
+          ESA_ENV && typeof ESA_ENV === "object"
+            ? ESA_ENV.SUPABASE_URL || ESA_ENV.VITE_SUPABASE_URL || ""
+            : "",
+        anonKeyPreview:
+          ESA_ENV && typeof ESA_ENV === "object"
+            ? maskString(
+                ESA_ENV.SUPABASE_ANON_KEY ||
+                  ESA_ENV.VITE_SUPABASE_ANON_KEY ||
+                  ""
+              )
+            : ""
+      },
+      processEnv: typeof process !== "undefined" && process && process.env
+        ? {
+            url:
+              process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "",
+            anonKeyPreview: maskString(
+              process.env.SUPABASE_ANON_KEY ||
+                process.env.VITE_SUPABASE_ANON_KEY ||
+                ""
+            )
+          }
+        : null,
+      globalEnv:
+        typeof globalThis === "object" && globalThis && globalThis.ENV
+          ? {
+              url:
+                globalThis.ENV.SUPABASE_URL ||
+                globalThis.ENV.VITE_SUPABASE_URL ||
+                "",
+              anonKeyPreview: maskString(
+                globalThis.ENV.SUPABASE_ANON_KEY ||
+                  globalThis.ENV.VITE_SUPABASE_ANON_KEY ||
+                  ""
+              )
+            }
+          : null
+    }
+  };
+
+  return snapshot;
+}
+
 async function getSupabaseClient() {
   try {
-    const getVar = (name, viteName) => {
-      let value = "";
-      if (ESA_ENV && typeof ESA_ENV === "object") {
-        value = ESA_ENV[name] || ESA_ENV[viteName] || "";
-        if (value) {
-          return value;
-        }
-      }
-      if (typeof process !== "undefined" && process && process.env) {
-        value = process.env[name] || process.env[viteName] || "";
-        if (value) {
-          return value;
-        }
-      }
-      if (typeof globalThis === "object" && globalThis) {
-        const g = globalThis;
-        const env = g.ENV || {};
-        value =
-          (env && (env[name] || env[viteName])) ||
-          g[name] ||
-          g[viteName] ||
-          "";
-      }
-      return value;
-    };
-
-    const url = getVar("SUPABASE_URL", "VITE_SUPABASE_URL");
-    const key = getVar("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY");
+    const url = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL");
+    const key = getEnvVar("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY");
 
     if (!url || !key) {
       return null;
@@ -52,6 +171,10 @@ async function handleRequest(request) {
   const url = new URL(request.url);
   const pathname = url.pathname;
 
+  if (pathname.endsWith("/api/debug/env")) {
+    return handleEnvDebug(request);
+  }
+
   if (pathname.endsWith("/api/health")) {
     return jsonResponse(
       {
@@ -59,10 +182,6 @@ async function handleRequest(request) {
       },
       200
     );
-  }
-
-  if (pathname.endsWith("/api/debug/env")) {
-    return handleEnvDebug();
   }
 
   if (pathname.endsWith("/api/cloud/snapshot")) {
@@ -131,6 +250,21 @@ async function handleAuthRequest(request, url) {
   );
 }
 
+async function handleEnvDebug(request) {
+  if (request.method !== "GET") {
+    return jsonResponse(
+      {
+        error: "仅支持 GET 请求"
+      },
+      405
+    );
+  }
+
+  const snapshot = buildEnvDebugSnapshot();
+
+  return jsonResponse(snapshot, 200);
+}
+
 async function parseJsonBody(request) {
   try {
     const text = await request.text();
@@ -141,24 +275,6 @@ async function parseJsonBody(request) {
   } catch {
     return {};
   }
-}
-
-async function handleEnvDebug() {
-  const result = {
-    ESA_ENV_keys: ESA_ENV && typeof ESA_ENV === "object" ? Object.keys(ESA_ENV) : [],
-    process_env_keys:
-      typeof process !== "undefined" && process && process.env ? Object.keys(process.env) : [],
-    global_ENV_keys:
-      typeof globalThis === "object" && globalThis && globalThis.ENV
-        ? Object.keys(globalThis.ENV)
-        : []
-  };
-  return jsonResponse(
-    {
-      env: result
-    },
-    200
-  );
 }
 
 async function handleSignup(request, supabase) {
