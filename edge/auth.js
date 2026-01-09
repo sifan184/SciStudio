@@ -90,7 +90,7 @@ async function handleSignup(request) {
 
   try {
     const normalizedEmail = normalizeEmail(email);
-    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const edgeKV = new EdgeKV({ namespace: "SciStudio" });
     const emailKey = `user_email_${normalizedEmail}`;
     const existingUserId = await edgeKV.get(emailKey, { type: "text" });
     if (existingUserId) {
@@ -156,7 +156,7 @@ async function handleLogin(request) {
 
   try {
     const normalizedEmail = normalizeEmail(email);
-    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const edgeKV = new EdgeKV({ namespace: "SciStudio" });
     const emailKey = `user_email_${normalizedEmail}`;
     const userId = await edgeKV.get(emailKey, { type: "text" });
     if (!userId) {
@@ -219,7 +219,7 @@ async function handleLogout(request) {
   const sessionId = getSessionIdFromRequest(request);
   if (sessionId) {
     try {
-      const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+      const edgeKV = new EdgeKV({ namespace: "SciStudio" });
       await edgeKV.put(`session_${sessionId}`, "", {});
     } catch (e) {
     }

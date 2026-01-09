@@ -56,7 +56,7 @@ async function handleWorksRequest(request, url) {
 
 async function handleWorksList() {
   try {
-    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const edgeKV = new EdgeKV({ namespace: "SciStudio" });
     const list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
     if (!Array.isArray(list)) {
       return jsonResponse(
@@ -99,7 +99,7 @@ async function handleWorkCreate(request) {
   const sourceWorkId = typeof body.sourceWorkId === "string" ? body.sourceWorkId : "";
   const now = Date.now();
   const workId = generateId("w_");
-  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const edgeKV = new EdgeKV({ namespace: "SciStudio" });
 
   let artifact = baseArtifact;
   let messages = null;
@@ -232,7 +232,7 @@ async function handleWorkUpdate(request, workId) {
       401
     );
   }
-  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const edgeKV = new EdgeKV({ namespace: "SciStudio" });
   const ownerId = await edgeKV.get(`work_${workId}_owner`, { type: "text" });
   if (!ownerId || ownerId !== user.id) {
     return jsonResponse(
@@ -315,7 +315,7 @@ async function handleWorkDelete(request, workId) {
       401
     );
   }
-  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const edgeKV = new EdgeKV({ namespace: "SciStudio" });
   const ownerId = await edgeKV.get(`work_${workId}_owner`, { type: "text" });
   if (!ownerId || ownerId !== user.id) {
     return jsonResponse(

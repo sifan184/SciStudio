@@ -61,7 +61,7 @@ async function saveWorkRecordToOss(record) {
     return;
   } catch (e) {
   }
-  const edgeKV = new EdgeKV({ namespace: WORKINFO_KV_NAMESPACE });
+  const edgeKV = new EdgeKV({ namespace: "WorkInfo" });
   const fallbackKey = `work_${record.id}_full`;
   await edgeKV.put(fallbackKey, JSON.stringify(record));
 }
@@ -92,7 +92,7 @@ async function loadWorkRecordFromOss(workId) {
   } catch (e) {
   }
   const fallbackKey = `work_${workId}_full`;
-  const workInfoKV = new EdgeKV({ namespace: WORKINFO_KV_NAMESPACE });
+  const workInfoKV = new EdgeKV({ namespace: "WorkInfo" });
   let text = await workInfoKV.get(fallbackKey, { type: "text" });
   if (!text) {
     const legacyKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
@@ -124,12 +124,12 @@ async function deleteWorkRecordFromOss(workId) {
   } catch (e) {
   }
   const fallbackKey = `work_${workId}_full`;
-  const workInfoKV = new EdgeKV({ namespace: WORKINFO_KV_NAMESPACE });
+  const workInfoKV = new EdgeKV({ namespace: "WorkInfo" });
   try {
     await workInfoKV.delete(fallbackKey);
   } catch {
   }
-  const legacyKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const legacyKV = new EdgeKV({ namespace: "SciStudio" });
   try {
     await legacyKV.delete(fallbackKey);
   } catch {
@@ -194,7 +194,7 @@ function hashPassword(password) {
 }
 
 async function createSession(userId) {
-  const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+  const edgeKV = new EdgeKV({ namespace: "SciStudio" });
   const sessionId = generateId("s_");
   const now = Date.now();
   const expiresAt = now + 30 * 24 * 60 * 60 * 1000;
@@ -213,7 +213,7 @@ async function getUserFromSession(sessionId) {
     return null;
   }
   try {
-    const edgeKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
+    const edgeKV = new EdgeKV({ namespace: "SciStudio" });
     const session = await edgeKV.get(`session_${sessionId}`, { type: "json" });
     if (!session || typeof session !== "object") {
       return null;
