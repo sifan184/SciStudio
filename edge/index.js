@@ -2,12 +2,13 @@ const EDGE_KV_NAMESPACE = "947407923057872896";
 
 async function getSupabaseClient() {
   try {
-    const url = (globalThis as any).SUPABASE_URL || "";
-    const key = (globalThis as any).SUPABASE_ANON_KEY || "";
+    const globalObj = typeof globalThis === "object" && globalThis ? globalThis : {};
+    const url = globalObj.SUPABASE_URL || "";
+    const key = globalObj.SUPABASE_ANON_KEY || "";
     if (!url || !key) {
       return null;
     }
-    const mod: any = await import("@supabase/supabase-js");
+    const mod = await import("@supabase/supabase-js");
     const createClient = mod.createClient || (mod.default && mod.default.createClient);
     if (typeof createClient !== "function") {
       return null;
