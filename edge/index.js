@@ -2,9 +2,18 @@ const EDGE_KV_NAMESPACE = "947407923057872896";
 
 async function getSupabaseClient() {
   try {
-    const globalObj = typeof globalThis === "object" && globalThis ? globalThis : {};
-    const url = globalObj.SUPABASE_URL || "";
-    const key = globalObj.SUPABASE_ANON_KEY || "";
+    const env =
+      (typeof process !== "undefined" && process && process.env) ||
+      (typeof globalThis === "object" && globalThis && (globalThis.ENV || globalThis)) ||
+      {};
+    const url =
+      env.SUPABASE_URL ||
+      env.VITE_SUPABASE_URL ||
+      "";
+    const key =
+      env.SUPABASE_ANON_KEY ||
+      env.VITE_SUPABASE_ANON_KEY ||
+      "";
     if (!url || !key) {
       return null;
     }
