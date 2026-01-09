@@ -1,9 +1,16 @@
 const EDGE_KV_NAMESPACE = "947407923057872896";
+let ESA_ENV = null;
 
 async function getSupabaseClient() {
   try {
     const getVar = (name, viteName) => {
       let value = "";
+      if (ESA_ENV && typeof ESA_ENV === "object") {
+        value = ESA_ENV[name] || ESA_ENV[viteName] || "";
+        if (value) {
+          return value;
+        }
+      }
       if (typeof process !== "undefined" && process && process.env) {
         value = process.env[name] || process.env[viteName] || "";
         if (value) {
@@ -337,11 +344,17 @@ function jsonResponse(body, status) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env, ctx) {
+    if (env && typeof env === "object") {
+      ESA_ENV = env;
+    }
     return handleRequest(request);
   }
 };
 
 export async function fetch(request, env, ctx) {
+  if (env && typeof env === "object") {
+    ESA_ENV = env;
+  }
   return handleRequest(request);
 }
