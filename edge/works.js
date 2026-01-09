@@ -181,6 +181,15 @@ async function handleWorkCreate(request) {
 }
 
 async function handleWorkGet(request, workId) {
+  const user = await getUserFromRequest(request);
+  if (!user) {
+    return jsonResponse(
+      {
+        error: "未登录"
+      },
+      401
+    );
+  }
   const record = await loadWorkRecordFromOss(workId);
   if (!record || !record.artifact) {
     return jsonResponse(

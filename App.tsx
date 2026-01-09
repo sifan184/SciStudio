@@ -152,6 +152,10 @@ function AppInner() {
             credentials: "include"
           });
           if (!res.ok) {
+            if (res.status === 401) {
+              setIsAuthPanelOpen(true);
+              setAuthError("请先登录后再打开作品");
+            }
             return;
           }
           const json = await res.json();
