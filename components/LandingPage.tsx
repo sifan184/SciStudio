@@ -271,7 +271,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
       </button>
       <button
         onClick={() => checkLoginBefore('create')}
-        className="px-3 py-1 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700"
+        className="px-3 py-1 rounded-full hover:bg-slate-800 hover:text-white"
       >
         创作
       </button>

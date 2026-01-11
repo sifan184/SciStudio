@@ -796,7 +796,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
         className={
           activeMenu === 'create'
             ? "px-3 py-1 rounded-full bg-brand-600 text-white hover:bg-brand-500"
-            : "px-3 py-1 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700"
+            : "px-3 py-1 rounded-full hover:bg-slate-800 hover:text-white"
         }
       >
         创作
