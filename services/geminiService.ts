@@ -400,7 +400,7 @@ export const generateScienceArtifact = async (
   2.  **Recharts**: For 2D data charts. (Use '<Recharts.LineChart>', etc.)
   3.  **Lucide**: Icons. (Use '<Lucide.Atom />')
   4.  **THREE**: The full Three.js namespace.
-  5.  **D3**: d3 namespace for layouts and scales. 建议主要将 D3 用作布局和数值计算引擎，例如力导向布局、树形布局、弦图、比例尺等，由 React 负责渲染 SVG 或 HTML 元素，而不是让 D3 直接操作 DOM。D3 已作为全局参数提供，无需手动 import。
+  5.  **D3**: d3 namespace for layouts and scales. 建议主要将 D3 用作布局和数值计算引擎，例如力导向布局、树形布局、弦图、比例尺等，由 React 负责渲染 SVG 或 HTML 元素，而不是让 D3 直接操作 DOM。运行时代码会同时提供 D3 和 d3 两个名称以兼容常见写法，但推荐在代码中使用 D3 前缀。D3 已作为全局参数提供，无需手动 import。
   6.  **R3F**: @react-three/fiber namespace.
       *   CORE COMPONENT: <R3F.Canvas> (Root of all 3D).
       *   Hooks: R3F.useFrame, R3F.useThree, R3F.useLoader.

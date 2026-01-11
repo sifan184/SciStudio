@@ -194,6 +194,7 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
       // SAFETY: Use explicit string concatenation + newlines to avoid comment issues and template literal breakage
       const funcBody = [
         'try {',
+        'const d3 = D3;',
         transpiled,
         '} catch (e) {',
         '  return () => React.createElement("div", {className: "text-red-500 p-4"}, "Initialization Error: " + e.message);',
