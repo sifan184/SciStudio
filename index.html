@@ -39,7 +39,6 @@
         background-color: #020617;
         color: white;
       }
-      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -53,6 +52,12 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #475569; 
+      }
+      .horizontal-scroll-hide {
+        scrollbar-width: none;
+      }
+      .horizontal-scroll-hide::-webkit-scrollbar {
+        display: none;
       }
     </style>
   <script type="importmap">

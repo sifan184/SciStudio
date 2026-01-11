@@ -6,6 +6,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { WorksList } from './components/WorksList';
 import { generateScienceArtifact } from './services/geminiService';
 import * as Lucide from 'lucide-react';
+import { LandingPage } from './components/LandingPage';
 
 const migrateWorks = (works: ScienceArtifact[]): ScienceArtifact[] => {
   return works.map(w => {
@@ -53,7 +54,13 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
   }
 }
 
-function AppInner() {
+interface AppInnerProps {
+  onBackToLanding: () => void;
+  entryAction: 'none' | 'create' | 'viewWorks' | 'openAuth';
+  onEntryActionConsumed: () => void;
+}
+
+function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppInnerProps) {
   interface AuthUser {
     id: string;
     email: string | null;
@@ -158,8 +165,8 @@ function AppInner() {
           });
           if (!res.ok) {
             if (res.status === 401) {
-              setIsAuthPanelOpen(true);
-              setAuthError("请先登录后再打开作品");
+              setAuthUser(null);
+              onBackToLanding();
             }
             return;
           }
@@ -187,6 +194,10 @@ function AppInner() {
   };
 
   const handleCreateWork = () => {
+    if (isGenerating) {
+      setError("您有作品正在生成中，请稍后重试");
+      return;
+    }
     if (!authUser) {
       setIsAuthPanelOpen(true);
       setAuthError("请先登录后再创建作品");
@@ -225,6 +236,10 @@ function AppInner() {
   };
 
   const handleDuplicateWork = (id: string) => {
+    if (isGenerating) {
+      setError("您有作品正在生成中，请稍后重试");
+      return;
+    }
     if (!authUser) {
       setIsAuthPanelOpen(true);
       setAuthError("请先登录后再创建作品");
@@ -325,6 +340,27 @@ function AppInner() {
     };
   }, []);
 
+  useEffect(() => {
+    if (authLoading) return;
+    if (entryAction === 'none') return;
+
+    if (entryAction === 'create') {
+      handleCreateWork();
+    } else if (entryAction === 'viewWorks') {
+      if (!authUser) {
+        setIsAuthPanelOpen(true);
+        setAuthError("请先登录后再查看作品");
+      } else {
+        handleHomeClick();
+      }
+    } else if (entryAction === 'openAuth') {
+      setIsAuthPanelOpen(true);
+      setAuthMode("login");
+      setAuthError(null);
+    }
+    onEntryActionConsumed();
+  }, [entryAction, authLoading, authUser, handleCreateWork, handleHomeClick, onEntryActionConsumed]);
+
   const handleAuthSubmit = async () => {
     setAuthError(null);
     try {
@@ -399,6 +435,7 @@ function AppInner() {
         credentials: "include"
       });
       setAuthUser(null);
+      onBackToLanding();
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       setAuthError(message);
@@ -746,10 +783,9 @@ function AppInner() {
       {/* Navbar */}
       <header className="h-14 flex-shrink-0 border-b border-slate-800 bg-slate-900/90 backdrop-blur flex items-center justify-between px-4 sm:px-6 z-20 shadow-sm">
         <div className="flex items-center gap-8">
-          {/* Logo Area */}
           <div 
             className="flex items-center gap-2 cursor-pointer group select-none"
-            onClick={handleHomeClick}
+            onClick={onBackToLanding}
           >
             <div className="relative w-8 h-8 flex items-center justify-center">
                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-500 w-8 h-8 group-hover:rotate-180 transition-transform duration-700 ease-in-out"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -758,6 +794,20 @@ function AppInner() {
                 <span className="font-bold text-lg tracking-tight text-white leading-none">SciStudio<span className="text-brand-500">.ai</span></span>
                 <span className="text-[10px] text-slate-500 font-mono tracking-widest">可视化创意平台</span>
             </div>
+          </div>
+          <div className="flex items-center gap-4 text-sm text-slate-300">
+            <button
+              onClick={handleHomeClick}
+              className="px-2 py-1 rounded-full hover:bg-slate-800 hover:text-white"
+            >
+              作品
+            </button>
+            <button
+              onClick={handleCreateWork}
+              className="px-3 py-1 rounded-full bg-brand-600 text-white hover:bg-brand-500"
+            >
+              创作
+            </button>
           </div>
         </div>
 
@@ -873,20 +923,23 @@ function AppInner() {
             </div>
         )}
 
-        {/* Content Area */}
         <main className="flex-1 overflow-hidden relative flex flex-col transition-all duration-300">
-           {activeWork ? (
-              <ArtifactRenderer artifact={activeWork} onRuntimeError={handleRuntimeError} />
-           ) : (
-              <WorksList 
-                  works={works} 
-                  onSelect={handleSelectWork} 
-                  onCreate={handleCreateWork}
-                  onDelete={handleDeleteWork}
-                  onDuplicate={handleDuplicateWork}
-                  currentUserId={authUser ? authUser.id : null}
-              />
-           )}
+          {activeWork ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="w-full max-w-6xl aspect-video">
+                <ArtifactRenderer artifact={activeWork} onRuntimeError={handleRuntimeError} />
+              </div>
+            </div>
+          ) : (
+            <WorksList
+              works={works}
+              onSelect={handleSelectWork}
+              onCreate={handleCreateWork}
+              onDelete={handleDeleteWork}
+              onDuplicate={handleDuplicateWork}
+              currentUserId={authUser ? authUser.id : null}
+            />
+          )}
         </main>
 
         {/* Chat Sidebar (Conditional) */}
@@ -949,9 +1002,40 @@ function AppInner() {
 }
 
 export default function App() {
+  const [showLanding, setShowLanding] = useState(true);
+  const [entryAction, setEntryAction] = useState<'none' | 'create' | 'viewWorks' | 'openAuth'>('none');
+
+  const handleBackToLanding = () => {
+    setShowLanding(true);
+    setEntryAction('none');
+  };
+
+  const handleLandingCreate = () => {
+    setShowLanding(false);
+    setEntryAction('create');
+  };
+
+  const handleLandingViewWorks = () => {
+    setShowLanding(false);
+    setEntryAction('viewWorks');
+  };
+
+  if (showLanding) {
+    return (
+      <LandingPage
+        onCreateClick={handleLandingCreate}
+        onViewWorksClick={handleLandingViewWorks}
+      />
+    );
+  }
+
   return (
     <AppErrorBoundary>
-      <AppInner />
+      <AppInner
+        onBackToLanding={handleBackToLanding}
+        entryAction={entryAction}
+        onEntryActionConsumed={() => setEntryAction('none')}
+      />
     </AppErrorBoundary>
   );
 }

@@ -28,6 +28,7 @@ import { sanitizeCode } from '../utils/codeUtils';
 interface ArtifactRendererProps {
   artifact: ScienceArtifact;
   onRuntimeError?: (error: string) => void;
+  hideTitleBar?: boolean;
 }
 
 // Helper to handle ESM default export wrapping
@@ -150,7 +151,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, onRuntimeError }) => {
+export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, onRuntimeError, hideTitleBar }) => {
   const [Component, setComponent] = useState<React.FC | null>(null);
   const [compileError, setCompileError] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
@@ -275,8 +276,8 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
 
   return (
     <div className="flex flex-col h-full bg-slate-950 overflow-hidden relative">
-       {/* Title Bar */}
-      <div className="w-full z-10 p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0 shadow-sm">
+      {!hideTitleBar && (
+        <div className="w-full z-10 p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center shrink-0 shadow-sm">
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">{artifact.title}</h1>
             <p
@@ -292,11 +293,11 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
           >
             {showCode ? <HideIcon size={16} /> : <CodeIcon size={16} />}
           </button>
-       </div>
+        </div>
+      )}
 
-       {/* Render Area */}
        <div className="flex-1 w-full min-h-0 relative bg-slate-950/50">
-          {showCode && (
+          {showCode && !hideTitleBar && (
              <div className="absolute inset-0 z-20 bg-slate-900/95 backdrop-blur flex flex-col animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between px-6 py-3 border-b border-slate-800 bg-slate-950/50">
                     <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">Source Code</span>
