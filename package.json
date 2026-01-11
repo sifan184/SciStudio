@@ -16,6 +16,7 @@
     "@react-three/postprocessing": "^2.16.3",
     "@react-three/rapier": "^1.0.0",
     "ali-oss": "^6.21.0",
+    "d3": "^7.9.0",
     "framer-motion": "11.0.3",
     "katex": "0.16.11",
     "lucide-react": "0.344.0",

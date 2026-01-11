@@ -673,6 +673,298 @@ return DecisionTree;
 `
   },
   {
+    id: 'scientist-social-network',
+    createdAt: Date.now(),
+    title: "科学家合作关系图谱 (D3 力导向布局)",
+    description: "使用 D3 力导向布局展示科学家之间的合作与影响关系，结合 SVG 与交互面板讲解网络结构特征。",
+    code: `
+const ScientistGraph = () => {
+  const nodesData = React.useMemo(
+    () => [
+      { id: 'einstein', name: '爱因斯坦', field: '理论物理', group: 'relativity' },
+      { id: 'bohr', name: '玻尔', field: '量子理论', group: 'quantum' },
+      { id: 'heisenberg', name: '海森堡', field: '量子力学', group: 'quantum' },
+      { id: 'schrodinger', name: '薛定谔', field: '量子波动', group: 'quantum' },
+      { id: 'dirac', name: '狄拉克', field: '量子场论', group: 'quantum' },
+      { id: 'curie', name: '居里', field: '放射性', group: 'radio' },
+      { id: 'feynman', name: '费曼', field: '量子电动力学', group: 'qed' },
+      { id: 'planck', name: '普朗克', field: '量子论奠基', group: 'quantum' },
+      { id: 'maxwell', name: '麦克斯韦', field: '电磁场', group: 'em' },
+      { id: 'newton', name: '牛顿', field: '经典力学', group: 'classic' }
+    ],
+    []
+  );
+
+  const linksData = React.useMemo(
+    () => [
+      { source: 'planck', target: 'einstein', type: '启发' },
+      { source: 'einstein', target: 'bohr', type: '争论与合作' },
+      { source: 'bohr', target: 'heisenberg', type: '导师' },
+      { source: 'bohr', target: 'schrodinger', type: '学术交流' },
+      { source: 'heisenberg', target: 'dirac', type: '同代发展' },
+      { source: 'schrodinger', target: 'dirac', type: '理论互动' },
+      { source: 'dirac', target: 'feynman', type: '理论基础' },
+      { source: 'maxwell', target: 'einstein', type: '理论基础' },
+      { source: 'newton', target: 'einstein', type: '经典到相对论' },
+      { source: 'curie', target: 'einstein', type: '科学交流' },
+      { source: 'curie', target: 'planck', type: '放射性与量子' }
+    ],
+    []
+  );
+
+  const [nodes, setNodes] = React.useState(nodesData);
+  const [links, setLinks] = React.useState(linksData);
+  const [selectedId, setSelectedId] = React.useState('einstein');
+
+  React.useEffect(() => {
+    const sim = D3.forceSimulation(nodes)
+      .force(
+        'link',
+        D3.forceLink(links)
+          .id((d) => d.id)
+          .distance(120)
+          .strength(0.9)
+      )
+      .force('charge', D3.forceManyBody().strength(-260))
+      .force('center', D3.forceCenter(0, 0))
+      .force('collision', D3.forceCollide().radius(60))
+      .alphaDecay(0.03);
+
+    sim.on('tick', () => {
+      setNodes([...nodes]);
+      setLinks([...links]);
+    });
+
+    return () => {
+      sim.stop();
+    };
+  }, []);
+
+  const colorByGroup = (group) => {
+    if (group === 'relativity') return '#38bdf8';
+    if (group === 'quantum') return '#a855f7';
+    if (group === 'radio') return '#f97316';
+    if (group === 'qed') return '#22c55e';
+    if (group === 'em') return '#eab308';
+    if (group === 'classic') return '#64748b';
+    return '#e5e7eb';
+  };
+
+  const width = 900;
+  const height = 520;
+
+  const selectedNode = nodes.find((n) => n.id === selectedId) || nodes[0];
+  const neighborIds = React.useMemo(() => {
+    const s = new Set();
+    links.forEach((l) => {
+      if (l.source.id === selectedNode.id) s.add(l.target.id);
+      if (l.target.id === selectedNode.id) s.add(l.source.id);
+    });
+    return s;
+  }, [links, selectedNode]);
+
+  const strengthLabel = (type) => {
+    if (type === '导师') return '强';
+    if (type === '争论与合作') return '中等';
+    if (type === '理论基础') return '强';
+    if (type === '学术交流') return '中等';
+    if (type === '同代发展') return '一般';
+    return '一般';
+  };
+
+  return (
+    <div className="w-full h-full flex bg-slate-950 text-slate-50">
+      <div className="flex-1 flex flex-col border-r border-slate-800">
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 backdrop-blur">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Lucide.Share2 className="text-brand-400" size={18} />
+              科学家合作关系网络
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              使用 D3 力导向布局，根据“排斥 + 连接”规则自动排布节点。
+            </p>
+          </div>
+        </div>
+        <div className="flex-1 relative">
+          <svg
+            className="w-full h-full"
+            viewBox={\`0 0 \${width} \${height}\`}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <defs>
+              <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <rect width={width} height={height} fill="#020617" />
+            <g transform={\`translate(\${width / 2},\${height / 2})\`}>
+              {links.map((l, i) => {
+                const s = l.source;
+                const t = l.target;
+                if (!s || !t) return null;
+                const isActive =
+                  selectedNode &&
+                  ((s.id === selectedNode.id && neighborIds.has(t.id)) ||
+                    (t.id === selectedNode.id && neighborIds.has(s.id)));
+                return (
+                  <g key={i} opacity={isActive ? 1 : 0.35}>
+                    <line
+                      x1={s.x}
+                      y1={s.y}
+                      x2={t.x}
+                      y2={t.y}
+                      stroke={isActive ? '#38bdf8' : '#1e293b'}
+                      strokeWidth={isActive ? 2.4 : 1.2}
+                    />
+                    <text
+                      x={(s.x + t.x) / 2}
+                      y={(s.y + t.y) / 2}
+                      dy={-6}
+                      textAnchor="middle"
+                      className="text-[10px]"
+                      fill={isActive ? '#e5e7eb' : '#6b7280'}
+                    >
+                      {l.type}
+                    </text>
+                  </g>
+                );
+              })}
+              {nodes.map((n) => {
+                const isSelected = selectedNode && n.id === selectedNode.id;
+                const isNeighbor = neighborIds.has(n.id);
+                const opacity = isSelected || isNeighbor ? 1 : 0.45;
+                const radius = isSelected ? 20 : 14;
+                return (
+                  <g
+                    key={n.id}
+                    transform={\`translate(\${n.x},\${n.y})\`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelectedId(n.id)}
+                    opacity={opacity}
+                  >
+                    {isSelected && (
+                      <circle r={radius * 1.9} fill="url(#nodeGlow)" />
+                    )}
+                    <circle
+                      r={radius}
+                      fill={colorByGroup(n.group)}
+                      stroke={isSelected ? '#e5e7eb' : '#020617'}
+                      strokeWidth={isSelected ? 2 : 1}
+                    />
+                    <text
+                      y={radius + 16}
+                      textAnchor="middle"
+                      className="text-xs"
+                      fill="#e5e7eb"
+                    >
+                      {n.name}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div className="w-80 p-5 bg-slate-950/95 backdrop-blur border-l border-slate-800 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Lucide.User size={18} className="text-brand-400" />
+            <span className="text-sm text-slate-300">当前选中</span>
+          </div>
+        </div>
+        <div className="p-3 rounded-xl border border-slate-800 bg-slate-900/70">
+          <div className="text-lg font-semibold text-white">{selectedNode.name}</div>
+          <div className="text-xs text-slate-400 mt-1">{selectedNode.field}</div>
+          <div className="flex flex-wrap gap-1 mt-2 text-[10px]">
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+              分支: {selectedNode.group}
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+              邻居数: {neighborIds.size}
+            </span>
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-slate-400 mb-2">
+            D3 布局原理
+          </div>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            每个节点之间存在排斥力，连线提供吸引力，整体被压向画布中心。
+            通过调节力的强度，可以在“拥挤”和“过分疏散”之间取得平衡。
+          </p>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-slate-400 mb-2">
+            关系边含义
+          </div>
+          <div className="space-y-1.5 text-[11px] text-slate-400">
+            {links
+              .filter(
+                (l) =>
+                  l.source.id === selectedNode.id ||
+                  l.target.id === selectedNode.id
+              )
+              .map((l, i) => {
+                const other =
+                  l.source.id === selectedNode.id ? l.target : l.source;
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between px-2 py-1 rounded border border-slate-800 bg-slate-900/70"
+                  >
+                    <span className="text-slate-300">
+                      {selectedNode.name} ↔ {other.name}
+                    </span>
+                    <span className="text-slate-400">
+                      {l.type} · {strengthLabel(l.type)}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-slate-400 mb-2">
+            颜色图例
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colorByGroup('relativity') }} />
+              <span>相对论相关</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colorByGroup('quantum') }} />
+              <span>量子学派</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colorByGroup('radio') }} />
+              <span>放射性研究</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colorByGroup('qed') }} />
+              <span>量子电动力学</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colorByGroup('em') }} />
+              <span>电磁理论</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colorByGroup('classic') }} />
+              <span>经典力学</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+return ScientistGraph;
+`
+  },
+  {
     id: 'double-slit-experiment',
     createdAt: Date.now(),
     title: "双缝干涉实验可视化 (Double Slit)",

@@ -19,6 +19,8 @@ import * as KaTeX from 'katex';
 import * as Rapier from '@react-three/rapier';
 // @ts-ignore
 import * as PostProcessing from '@react-three/postprocessing';
+// @ts-ignore
+import * as D3 from 'd3';
 import { create as createZustandStore } from 'zustand';
 
 import { Sci3D } from '../utils/sci3d';
@@ -203,6 +205,7 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
         'Recharts', 
         'Lucide', 
         'THREE', 
+        'D3',
         'R3F', 
         'Drei', 
         'Physics', 
@@ -226,7 +229,8 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
           runtimeReact, 
           Recharts, 
           Lucide, 
-          Three, 
+          Three,
+          D3,
           safeR3F, 
           safeDrei, 
           safeCannon,

@@ -397,13 +397,14 @@ export const generateScienceArtifact = async (
   The following libraries are PRE-INSTALLED and available in the scope. DO NOT IMPORT THEM.
   
   1.  **React**: Functional components, hooks.
-  2.  **Recharts**: For 2D data charts. (Use \`<Recharts.LineChart>\`, etc.)
-  3.  **Lucide**: Icons. (Use \`<Lucide.Atom />\`)
+  2.  **Recharts**: For 2D data charts. (Use '<Recharts.LineChart>', etc.)
+  3.  **Lucide**: Icons. (Use '<Lucide.Atom />')
   4.  **THREE**: The full Three.js namespace.
-  5.  **R3F**: @react-three/fiber namespace.
-      *   CORE COMPONENT: \`<R3F.Canvas>\` (Root of all 3D).
-      *   Hooks: \`R3F.useFrame\`, \`R3F.useThree\`, \`R3F.useLoader\`.
-  6.  **Drei**: @react-three/drei namespace (Helpers).
+  5.  **D3**: d3 namespace for layouts and scales. 建议主要将 D3 用作布局和数值计算引擎，例如力导向布局、树形布局、弦图、比例尺等，由 React 负责渲染 SVG 或 HTML 元素，而不是让 D3 直接操作 DOM。D3 已作为全局参数提供，无需手动 import。
+  6.  **R3F**: @react-three/fiber namespace.
+      *   CORE COMPONENT: <R3F.Canvas> (Root of all 3D).
+      *   Hooks: R3F.useFrame, R3F.useThree, R3F.useLoader.
+  7.  **Drei**: @react-three/drei namespace (Helpers).
       *   Common: \`<Drei.OrbitControls />\`, \`<Drei.Stars />\`, \`<Drei.Text />\`, \`<Drei.Html />\`.
   7.  **Physics**: @react-three/cannon namespace (Physics Engine).
       *   CORE: \`<Physics.Physics>\` (Provider).
