@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { INITIAL_ARTIFACT, ADDITIONAL_WORKS } from '../constants';
 import { ArtifactRenderer } from './ArtifactRenderer';
 import { ScienceArtifact } from '../types';
+import { Navbar } from './Navbar';
 
 interface LandingPageProps {
   onCreateClick: () => void;
@@ -184,127 +185,102 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
       <ParticleBackground />
 
       <div className="relative z-10 flex flex-col min-h-screen">
-        <header className="h-14 flex-shrink-0 border-b border-slate-800 bg-slate-900/80 backdrop-blur flex items-center justify-between px-4 sm:px-6 shadow-sm">
-          <div
-            className="flex items-center gap-2 cursor-pointer group select-none"
-          >
-            <div className="relative w-8 h-8 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-brand-500 w-8 h-8 group-hover:rotate-180 transition-transform duration-700 ease-in-out"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-lg tracking-tight text-white leading-none">
-                SciStudio<span className="text-brand-500">.ai</span>
-              </span>
-              <span className="text-[10px] text-slate-500 font-mono tracking-widest">
-                可交互式科普动画创作平台
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 relative">
-            <button
-              onClick={() => {
-                setIsAuthOpen(prev => {
-                  const next = !prev;
-                  if (!next) {
-                    setAuthError(null);
-                    setPendingAction('none');
-                  } else {
-                    setAuthMode("login");
-                  }
-                  return next;
-                });
-              }}
-              className="px-3 py-1 rounded-full text-xs bg-brand-600 text-white hover:bg-brand-500"
-            >
-              登录
-            </button>
-            {isAuthOpen && (
-              <div
-                ref={authPanelRef}
-                className="absolute right-0 top-10 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-4 z-30"
-              >
-                <div className="flex mb-3 text-xs bg-slate-800 rounded-full overflow-hidden">
-                  <button
-                    onClick={() => {
+        <Navbar
+          right={
+            <>
+              <button
+                onClick={() => {
+                  setIsAuthOpen(prev => {
+                    const next = !prev;
+                    if (!next) {
+                      setAuthError(null);
+                      setPendingAction('none');
+                    } else {
                       setAuthMode("login");
-                      setAuthError(null);
-                    }}
-                    className={`flex-1 py-1.5 ${authMode === "login" ? "bg-brand-600 text-white" : "text-slate-300"}`}
-                  >
-                    登录
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAuthMode("signup");
-                      setAuthError(null);
-                    }}
-                    className={`flex-1 py-1.5 ${authMode === "signup" ? "bg-brand-600 text-white" : "text-slate-300"}`}
-                  >
-                    注册
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <div className="text-[11px] text-slate-300">邮箱</div>
-                    <input
-                      type="email"
-                      value={authEmail}
-                      onChange={e => setAuthEmail(e.target.value)}
-                      className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                      placeholder="you@example.com"
-                    />
+                    }
+                    return next;
+                  });
+                }}
+                className="px-3 py-1 rounded-full text-xs bg-brand-600 text-white hover:bg-brand-500"
+              >
+                登录
+              </button>
+              {isAuthOpen && (
+                <div
+                  ref={authPanelRef}
+                  className="absolute right-0 top-10 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-4 z-30"
+                >
+                  <div className="flex mb-3 text-xs bg-slate-800 rounded-full overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setAuthMode("login");
+                        setAuthError(null);
+                      }}
+                      className={`flex-1 py-1.5 ${authMode === "login" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+                    >
+                      登录
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAuthMode("signup");
+                        setAuthError(null);
+                      }}
+                      className={`flex-1 py-1.5 ${authMode === "signup" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+                    >
+                      注册
+                    </button>
                   </div>
-                  <div className="space-y-1">
-                    <div className="text-[11px] text-slate-300">密码</div>
-                    <input
-                      type="password"
-                      value={authPassword}
-                      onChange={e => setAuthPassword(e.target.value)}
-                      className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                      placeholder="至少 6 位"
-                    />
-                  </div>
-                  {authMode === "signup" && (
+                  <div className="space-y-2">
                     <div className="space-y-1">
-                      <div className="text-[11px] text-slate-300">确认密码</div>
+                      <div className="text-[11px] text-slate-300">邮箱</div>
                       <input
-                        type="password"
-                        value={authPasswordConfirm}
-                        onChange={e => setAuthPasswordConfirm(e.target.value)}
+                        type="email"
+                        value={authEmail}
+                        onChange={e => setAuthEmail(e.target.value)}
                         className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                        placeholder="再次输入密码"
+                        placeholder="you@example.com"
                       />
                     </div>
-                  )}
-                  {authError && (
-                    <div className="text-[11px] text-red-400">
-                      {authError}
+                    <div className="space-y-1">
+                      <div className="text-[11px] text-slate-300">密码</div>
+                      <input
+                        type="password"
+                        value={authPassword}
+                        onChange={e => setAuthPassword(e.target.value)}
+                        className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
+                        placeholder="至少 6 位"
+                      />
                     </div>
-                  )}
-                  <button
-                    onClick={handleAuthSubmit}
-                    disabled={authLoading || !authEmail || !authPassword}
-                    className="w-full mt-1 px-3 py-1.5 rounded-md text-xs bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {authMode === "login" ? "登录" : "注册"}
-                  </button>
+                    {authMode === "signup" && (
+                      <div className="space-y-1">
+                        <div className="text-[11px] text-slate-300">确认密码</div>
+                        <input
+                          type="password"
+                          value={authPasswordConfirm}
+                          onChange={e => setAuthPasswordConfirm(e.target.value)}
+                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none.focus:border-brand-500"
+                          placeholder="再次输入密码"
+                        />
+                      </div>
+                    )}
+                    {authError && (
+                      <div className="text-[11px] text-red-400">
+                        {authError}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleAuthSubmit}
+                      disabled={authLoading || !authEmail || !authPassword}
+                      className="w-full mt-1 px-3 py-1.5 rounded-md text-xs bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {authMode === "login" ? "登录" : "注册"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </header>
+              )}
+            </>
+          }
+        />
 
         <main className="flex-1 flex flex-col items-center px-4 sm:px-6 lg:px-8">
           <motion.div
