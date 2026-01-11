@@ -9,6 +9,21 @@ import * as Lucide from 'lucide-react';
 import { LandingPage } from './components/LandingPage';
 import { Navbar } from './components/Navbar';
 
+type RootView = 'landing' | 'create' | 'viewWorks';
+
+const ROOT_VIEW_STORAGE_KEY = 'scistudio-root-view';
+
+const getInitialRootView = (): RootView => {
+  if (typeof window === 'undefined') {
+    return 'landing';
+  }
+  const stored = window.localStorage.getItem(ROOT_VIEW_STORAGE_KEY);
+  if (stored === 'landing' || stored === 'create' || stored === 'viewWorks') {
+    return stored;
+  }
+  return 'landing';
+};
+
 const migrateWorks = (works: ScienceArtifact[]): ScienceArtifact[] => {
   return works.map(w => {
     if (w.title === "新建作品" && w.description === "空白画布") {
@@ -169,7 +184,26 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
             if (res.status === 401) {
               setAuthUser(null);
               onBackToLanding();
+              return;
             }
+            let message = `打开作品失败（HTTP ${res.status}）`;
+            try {
+              const text = await res.text();
+              if (text) {
+                try {
+                  const data = JSON.parse(text);
+                  if (data && typeof data === "object" && typeof (data as any).error === "string") {
+                    message = (data as any).error;
+                  } else {
+                    message = text;
+                  }
+                } catch {
+                  message = text;
+                }
+              }
+            } catch {
+            }
+            setError(message);
             return;
           }
           const json = await res.json();
@@ -779,6 +813,13 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
     };
   }, [isResizing]);
 
+  const handleCreateMenuClick = () => {
+    if (activeMenu === 'create') {
+      return;
+    }
+    handleCreateWork();
+  };
+
   const navbarCenter = (
     <>
       <button
@@ -792,7 +833,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
         作品
       </button>
       <button
-        onClick={handleCreateWork}
+        onClick={handleCreateMenuClick}
         className={
           activeMenu === 'create'
             ? "px-3 py-1 rounded-full bg-brand-600 text-white hover:bg-brand-500"
@@ -998,25 +1039,41 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
 }
 
 export default function App() {
-  const [showLanding, setShowLanding] = useState(true);
-  const [entryAction, setEntryAction] = useState<'none' | 'create' | 'viewWorks' | 'openAuth'>('none');
+  const [rootView, setRootView] = useState<RootView>(() => getInitialRootView());
+  const [entryAction, setEntryAction] = useState<'none' | 'create' | 'viewWorks' | 'openAuth'>(() => {
+    const initialView = getInitialRootView();
+    if (initialView === 'create') {
+      return 'create';
+    }
+    if (initialView === 'viewWorks') {
+      return 'viewWorks';
+    }
+    return 'none';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(ROOT_VIEW_STORAGE_KEY, rootView);
+  }, [rootView]);
 
   const handleBackToLanding = () => {
-    setShowLanding(true);
+    setRootView('landing');
     setEntryAction('none');
   };
 
   const handleLandingCreate = () => {
-    setShowLanding(false);
+    setRootView('create');
     setEntryAction('create');
   };
 
   const handleLandingViewWorks = () => {
-    setShowLanding(false);
+    setRootView('viewWorks');
     setEntryAction('viewWorks');
   };
 
-  if (showLanding) {
+  if (rootView === 'landing') {
     return (
       <LandingPage
         onCreateClick={handleLandingCreate}
