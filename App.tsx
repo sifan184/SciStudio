@@ -1040,16 +1040,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
 
 export default function App() {
   const [rootView, setRootView] = useState<RootView>(() => getInitialRootView());
-  const [entryAction, setEntryAction] = useState<'none' | 'create' | 'viewWorks' | 'openAuth'>(() => {
-    const initialView = getInitialRootView();
-    if (initialView === 'create') {
-      return 'create';
-    }
-    if (initialView === 'viewWorks') {
-      return 'viewWorks';
-    }
-    return 'none';
-  });
+  const [entryAction, setEntryAction] = useState<'none' | 'create' | 'viewWorks' | 'openAuth'>('none');
 
   useEffect(() => {
     if (typeof window === 'undefined') {
