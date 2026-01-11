@@ -44,6 +44,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
   const sampleWorks = allWorks.slice(0, 3);
   const scrollContainerRef = React.useRef<HTMLDivElement | null>(null);
   const [activeSampleIndex, setActiveSampleIndex] = React.useState(0);
+  const [worksCount, setWorksCount] = React.useState(totalWorks);
   const [isAuthOpen, setIsAuthOpen] = React.useState(false);
   const [authMode, setAuthMode] = React.useState<"login" | "signup">("login");
   const [authEmail, setAuthEmail] = React.useState("");
@@ -71,6 +72,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
   React.useEffect(() => {
     scrollToSample(0);
   }, []);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadWorksCount = async () => {
+      try {
+        const res = await fetch("/api/works", {
+          credentials: "include"
+        });
+        if (!res.ok) {
+          return;
+        }
+        const json = await res.json();
+        const list = Array.isArray(json.works) ? json.works : [];
+        if (!cancelled) {
+          const count = typeof totalWorks === "number" ? totalWorks : 0;
+          setWorksCount(Math.max(list.length, count));
+        }
+      } catch {
+      }
+    };
+    loadWorksCount();
+    return () => {
+      cancelled = true;
+    };
+  }, [totalWorks]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -379,10 +405,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
 
             <div className="flex flex-wrap items-center justify-center gap-4 mb-10 text-sm text-slate-300">
               <div className="flex items-baseline gap-2">
+                <span className="text-slate-400">累计创作</span>
                 <span className="text-3xl sm:text-4xl font-bold text-blue-200">
-                  {totalWorks}+
+                  {worksCount}+
                 </span>
-                <span className="text-slate-400">科普作品</span>
+                <span className="text-slate-400">作品</span>
               </div>
           
             </div>
