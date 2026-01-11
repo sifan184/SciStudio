@@ -14,14 +14,12 @@ interface LandingPageProps {
 
 interface SamplePreviewCardProps {
   artifact: ScienceArtifact;
-  onViewWorksClick: () => void;
 }
 
-const SamplePreviewCard: React.FC<SamplePreviewCardProps> = ({ artifact, onViewWorksClick }) => (
+const SamplePreviewCard: React.FC<SamplePreviewCardProps> = ({ artifact }) => (
   <motion.div
     whileHover={{ scale: 1.02, translateY: -4 }}
-    className="group rounded-2xl border border-slate-700/70 bg-slate-900/80 backdrop-blur-sm shadow-lg cursor-pointer overflow-hidden flex flex-col"
-    onClick={onViewWorksClick}
+    className="group rounded-2xl border border-slate-700/70 bg-slate-900/80 backdrop-blur-sm shadow-lg overflow-hidden flex flex-col"
   >
     <div className="relative w-full aspect-video bg-slate-950">
       <div className="absolute inset-0">
@@ -479,10 +477,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
                     key={work.id}
                     className="snap-start flex-shrink-0 w-[90vw] sm:w-[80vw] md:w-[70vw] lg:w-[65vw] max-w-5xl"
                   >
-                    <SamplePreviewCard
-                      artifact={work}
-                      onViewWorksClick={() => checkLoginBefore('viewWorks')}
-                    />
+                    <SamplePreviewCard artifact={work} />
                   </div>
                 ))}
               </div>
