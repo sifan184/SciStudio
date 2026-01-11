@@ -35,6 +35,10 @@ const SamplePreviewCard: React.FC<SamplePreviewCardProps> = ({ artifact, onViewW
 type LandingPendingAction = 'none' | 'create' | 'viewWorks';
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewWorksClick }) => {
+  interface AuthUser {
+    id: string;
+    email: string | null;
+  }
   const allWorks = [INITIAL_ARTIFACT, ...ADDITIONAL_WORKS];
   const totalWorks = allWorks.length;
   const sampleWorks = allWorks.slice(0, 3);
@@ -48,6 +52,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
   const [authLoading, setAuthLoading] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
   const [pendingAction, setPendingAction] = React.useState<LandingPendingAction>('none');
+  const [authUser, setAuthUser] = React.useState<AuthUser | null>(null);
   const authPanelRef = React.useRef<HTMLDivElement | null>(null);
 
   const scrollToSample = (index: number) => {
@@ -67,6 +72,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
     scrollToSample(0);
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadUser = async () => {
+      try {
+        const res = await fetch("/api/auth/user", {
+          credentials: "include"
+        });
+        if (!res.ok) {
+          return;
+        }
+        const json = await res.json();
+        if (!cancelled) {
+          setAuthUser(json.user ?? null);
+        }
+      } catch {
+      }
+    };
+    loadUser();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const openAuth = (mode: "login" | "signup", message: string | null, action: LandingPendingAction) => {
     setAuthMode(mode);
     setAuthError(message);
@@ -76,6 +104,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
 
   const checkLoginBefore = async (action: LandingPendingAction) => {
     if (action === 'none') {
+      return;
+    }
+    if (authUser) {
+      if (action === 'create') {
+        onCreateClick();
+      } else if (action === 'viewWorks') {
+        onViewWorksClick();
+      }
       return;
     }
     try {
@@ -142,6 +178,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
         setAuthError(messageFromJson || "认证失败，请稍后重试");
         return;
       }
+      const user =
+        data && typeof data === "object" && "user" in data
+          ? (data as any).user
+          : null;
+      setAuthUser(user ?? null);
       setIsAuthOpen(false);
       setAuthEmail("");
       setAuthPassword("");
@@ -158,6 +199,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
       setAuthError(`认证请求失败：${message}`);
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setAuthError(null);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include"
+      });
+      setAuthUser(null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setAuthError(message);
     }
   };
 
@@ -187,98 +242,113 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
       <div className="relative z-10 flex flex-col min-h-screen">
         <Navbar
           right={
-            <>
-              <button
-                onClick={() => {
-                  setIsAuthOpen(prev => {
-                    const next = !prev;
-                    if (!next) {
-                      setAuthError(null);
-                      setPendingAction('none');
-                    } else {
-                      setAuthMode("login");
-                    }
-                    return next;
-                  });
-                }}
-                className="px-3 py-1 rounded-full text-xs bg-brand-600 text-white hover:bg-brand-500"
-              >
-                登录
-              </button>
-              {isAuthOpen && (
-                <div
-                  ref={authPanelRef}
-                  className="absolute right-0 top-10 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-4 z-30"
+            authUser ? (
+              <>
+                <span className="text-xs text-slate-300 max-w-[140px] truncate">
+                  {authUser.email}
+                </span>
+                <button
+                  onClick={handleSignOut}
+                  disabled={authLoading}
+                  className="px-3 py-1 rounded-full text-xs bg-slate-800 text-slate-100 hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <div className="flex mb-3 text-xs bg-slate-800 rounded-full overflow-hidden">
-                    <button
-                      onClick={() => {
+                  退出登录
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setIsAuthOpen(prev => {
+                      const next = !prev;
+                      if (!next) {
+                        setAuthError(null);
+                        setPendingAction('none');
+                      } else {
                         setAuthMode("login");
-                        setAuthError(null);
-                      }}
-                      className={`flex-1 py-1.5 ${authMode === "login" ? "bg-brand-600 text-white" : "text-slate-300"}`}
-                    >
-                      登录
-                    </button>
-                    <button
-                      onClick={() => {
-                        setAuthMode("signup");
-                        setAuthError(null);
-                      }}
-                      className={`flex-1 py-1.5 ${authMode === "signup" ? "bg-brand-600 text-white" : "text-slate-300"}`}
-                    >
-                      注册
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <div className="text-[11px] text-slate-300">邮箱</div>
-                      <input
-                        type="email"
-                        value={authEmail}
-                        onChange={e => setAuthEmail(e.target.value)}
-                        className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                        placeholder="you@example.com"
-                      />
+                      }
+                      return next;
+                    });
+                  }}
+                  className="px-3 py-1 rounded-full text-xs bg-brand-600 text-white hover:bg-brand-500"
+                >
+                  登录
+                </button>
+                {isAuthOpen && (
+                  <div
+                    ref={authPanelRef}
+                    className="absolute right-0 top-10 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-xl p-4 z-30"
+                  >
+                    <div className="flex mb-3 text-xs bg-slate-800 rounded-full overflow-hidden">
+                      <button
+                        onClick={() => {
+                          setAuthMode("login");
+                          setAuthError(null);
+                        }}
+                        className={`flex-1 py-1.5 ${authMode === "login" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+                      >
+                        登录
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAuthMode("signup");
+                          setAuthError(null);
+                        }}
+                        className={`flex-1 py-1.5 ${authMode === "signup" ? "bg-brand-600 text-white" : "text-slate-300"}`}
+                      >
+                        注册
+                      </button>
                     </div>
-                    <div className="space-y-1">
-                      <div className="text-[11px] text-slate-300">密码</div>
-                      <input
-                        type="password"
-                        value={authPassword}
-                        onChange={e => setAuthPassword(e.target.value)}
-                        className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                        placeholder="至少 6 位"
-                      />
-                    </div>
-                    {authMode === "signup" && (
+                    <div className="space-y-2">
                       <div className="space-y-1">
-                        <div className="text-[11px] text-slate-300">确认密码</div>
+                        <div className="text-[11px] text-slate-300">邮箱</div>
                         <input
-                          type="password"
-                          value={authPasswordConfirm}
-                          onChange={e => setAuthPasswordConfirm(e.target.value)}
-                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none.focus:border-brand-500"
-                          placeholder="再次输入密码"
+                          type="email"
+                          value={authEmail}
+                          onChange={e => setAuthEmail(e.target.value)}
+                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
+                          placeholder="you@example.com"
                         />
                       </div>
-                    )}
-                    {authError && (
-                      <div className="text-[11px] text-red-400">
-                        {authError}
+                      <div className="space-y-1">
+                        <div className="text-[11px] text-slate-300">密码</div>
+                        <input
+                          type="password"
+                          value={authPassword}
+                          onChange={e => setAuthPassword(e.target.value)}
+                          className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
+                          placeholder="至少 6 位"
+                        />
                       </div>
-                    )}
-                    <button
-                      onClick={handleAuthSubmit}
-                      disabled={authLoading || !authEmail || !authPassword}
-                      className="w-full mt-1 px-3 py-1.5 rounded-md text-xs bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {authMode === "login" ? "登录" : "注册"}
-                    </button>
+                      {authMode === "signup" && (
+                        <div className="space-y-1">
+                          <div className="text-[11px] text-slate-300">确认密码</div>
+                          <input
+                            type="password"
+                            value={authPasswordConfirm}
+                            onChange={e => setAuthPasswordConfirm(e.target.value)}
+                            className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
+                            placeholder="再次输入密码"
+                          />
+                        </div>
+                      )}
+                      {authError && (
+                        <div className="text-[11px] text-red-400">
+                          {authError}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleAuthSubmit}
+                        disabled={authLoading || !authEmail || !authPassword}
+                        className="w-full mt-1 px-3 py-1.5 rounded-md text-xs bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {authMode === "login" ? "登录" : "注册"}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </>
+                )}
+              </>
+            )
           }
         />
 
