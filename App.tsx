@@ -923,10 +923,8 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
 
         <main className="flex-1 overflow-hidden relative flex flex-col transition-all duration-300">
           {activeWork ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="w-full max-w-6xl aspect-video">
-                <ArtifactRenderer artifact={activeWork} onRuntimeError={handleRuntimeError} />
-              </div>
+            <div className="flex-1 min-h-0 relative">
+              <ArtifactRenderer artifact={activeWork} onRuntimeError={handleRuntimeError} />
             </div>
           ) : (
             <WorksList
