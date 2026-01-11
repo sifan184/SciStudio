@@ -261,12 +261,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
     };
   }, [isAuthOpen]);
 
+  const navbarCenter = (
+    <>
+      <button
+        onClick={() => checkLoginBefore('viewWorks')}
+        className="px-2 py-1 rounded-full hover:bg-slate-800 hover:text-white"
+      >
+        作品
+      </button>
+      <button
+        onClick={() => checkLoginBefore('create')}
+        className="px-3 py-1 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700"
+      >
+        创作
+      </button>
+    </>
+  );
+
   return (
     <div className="relative w-full min-h-screen overflow-hidden text-white font-sans selection:bg-blue-500/30">
       <ParticleBackground />
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <Navbar
+          center={navbarCenter}
           right={
             authUser ? (
               <>
