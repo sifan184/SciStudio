@@ -22,6 +22,7 @@ import * as PostProcessing from '@react-three/postprocessing';
 // @ts-ignore
 import * as D3 from 'd3';
 import { create as createZustandStore } from 'zustand';
+import * as Babel from '@babel/standalone';
 
 import { Sci3D } from '../utils/sci3d';
 import { ScienceArtifact } from '../types';
@@ -168,13 +169,7 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
       // 1. Sanitize Code using shared utility
       const cleanCode = sanitizeCode(artifact.code);
 
-      // 2. Transpile
-      const babel = (window as any).Babel;
-      if (!babel) {
-        throw new Error("Babel compiler not loaded. Please refresh the page.");
-      }
-
-      const transpiled = babel.transform(cleanCode, {
+      const transpiled = Babel.transform(cleanCode, {
         presets: ['react', 'es2017', 'typescript'],
         parserOpts: { allowReturnOutsideFunction: true },
         filename: 'artifact.tsx'

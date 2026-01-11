@@ -1,3 +1,5 @@
+import * as Babel from '@babel/standalone';
+
 export const sanitizeCode = (code: string): string => {
   let cleanCode = code;
   
@@ -77,17 +79,8 @@ export const validateCode = (code: string): ValidationResult => {
         error: `Detected possibly undeclared ref variables: ${undeclaredRefs.join(', ')}`
       };
     }
-    
-    // Check for Babel
-    const babel = (window as any).Babel;
-    if (!babel) {
-      // If Babel isn't loaded yet, we can't validate, so we assume valid to avoid blocking
-      return { isValid: true };
-    }
 
-    // 1. Dry-run Transpilation
-    // Added typescript preset to handle type annotations
-    const transpiled = babel.transform(cleanCode, {
+    const transpiled = Babel.transform(cleanCode, {
       presets: ['react', 'es2017', 'typescript'],
       parserOpts: { allowReturnOutsideFunction: true },
       filename: 'validation.tsx'
