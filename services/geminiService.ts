@@ -156,6 +156,11 @@ const parsePlanningResponse = (text: string, currentArtifact: ScienceArtifact | 
     };
 };
 
+const hasChinese = (text: string | undefined | null): boolean => {
+    if (!text) return false;
+    return /[\u3400-\u9FFF]/.test(text);
+};
+
 const parseResponse = (text: string, currentArtifact: ScienceArtifact | null): GenerationResponse => {
     const blocks: {lang: string, content: string, index: number}[] = [];
     const regex = /```(\w*)\s*([\s\S]*?)```/g;
@@ -169,9 +174,9 @@ const parseResponse = (text: string, currentArtifact: ScienceArtifact | null): G
     }
 
     let metadata: PlanningMetadata = {
-        reply: "Generated successfully",
-        title: "New Visualization",
-        description: "AI Generated Artifact"
+        reply: "生成成功",
+        title: currentArtifact?.title || "新建作品",
+        description: currentArtifact?.description || "由 AI 生成的交互式科学可视化作品"
     };
     let code = "";
     let sceneDsl: any | null = null;
@@ -221,13 +226,23 @@ const parseResponse = (text: string, currentArtifact: ScienceArtifact | null): G
         }
     }
 
+    const finalTitle =
+        hasChinese(metadata.title)
+            ? metadata.title!
+            : (currentArtifact?.title || "新建作品");
+
+    const finalDescription =
+        hasChinese(metadata.description)
+            ? metadata.description!
+            : (currentArtifact?.description || "");
+
     return {
         reply: metadata.reply || "Done.",
         artifact: {
             id: currentArtifact?.id || '',
             createdAt: currentArtifact?.createdAt || Date.now(),
-            title: metadata.title || "Untitled",
-            description: metadata.description || "",
+            title: finalTitle,
+            description: finalDescription,
             code: code
         }
     };
@@ -272,8 +287,11 @@ export const generateScienceArtifact = async (
   Your goal: Generate INTERACTIVE, AESTHETIC, ROBUST React Components to visualize science.
 
   [LANGUAGE RULE]
-  1.  **IMPORTANT:** ALL user-facing text (titles, buttons, labels, tooltips, descriptions) MUST be in **SIMPLIFIED CHINESE (简体中文)**.
-  2.  Variable names and comments should remain in English for code clarity.
+  1.  所有用户可见文案（标题、副标题、按钮、标签、提示、段落说明、图表轴标题等）必须使用 **纯简体中文**。
+  2.  不要在中文标题下再单独给出英文标题或副标题，也不要输出“中英对照”的双语段落。
+  3.  如确需出现英文专有名词（如 DNA、RNA、ATP 等），应嵌入在完整的中文句子中，例如“DNA 复制过程的阶段变化”，整句仍为中文。
+  4.  Metadata.title、Metadata.description 以及规划 JSON 中所有说明字段必须是简体中文。
+  5.  变量名、类型名等代码内部标识符可以使用英文，以保持代码可读性，但这些不属于用户可见文案。
 
   [HARD CONSTRAINTS / 硬约束]
   1.  只能使用本项目已提供的技术栈和库（见 AVAILABLE LIBRARIES），禁止引入新的依赖或在代码中使用 import。
