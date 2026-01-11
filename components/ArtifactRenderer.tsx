@@ -22,7 +22,6 @@ import * as PostProcessing from '@react-three/postprocessing';
 // @ts-ignore
 import * as D3 from 'd3';
 import { create as createZustandStore } from 'zustand';
-import * as Babel from '@babel/standalone';
 
 import { Sci3D } from '../utils/sci3d';
 import { ScienceArtifact } from '../types';
@@ -33,6 +32,39 @@ interface ArtifactRendererProps {
   onRuntimeError?: (error: string) => void;
   hideTitleBar?: boolean;
 }
+
+let babelStandalonePromise: Promise<any> | null = null;
+
+const loadBabelStandalone = () => {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Babel runtime is only available in browser'));
+  }
+  const existing = (window as any).Babel;
+  if (existing) {
+    return Promise.resolve(existing);
+  }
+  if (babelStandalonePromise) {
+    return babelStandalonePromise;
+  }
+  babelStandalonePromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/@babel/standalone/babel.min.js';
+    script.async = true;
+    script.onload = () => {
+      const runtime = (window as any).Babel;
+      if (!runtime) {
+        reject(new Error('Babel runtime failed to initialize'));
+        return;
+      }
+      resolve(runtime);
+    };
+    script.onerror = () => {
+      reject(new Error('Failed to load Babel runtime'));
+    };
+    document.head.appendChild(script);
+  });
+  return babelStandalonePromise;
+};
 
 // Helper to handle ESM default export wrapping
 const normalizeModule = (mod: any) => {
@@ -162,73 +194,73 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
 
   useEffect(() => {
     if (!artifact.code) return;
+    let cancelled = false;
 
-    try {
-      setCompileError(null);
-      
-      // 1. Sanitize Code using shared utility
-      const cleanCode = sanitizeCode(artifact.code);
+    const run = async () => {
+      try {
+        setCompileError(null);
+        const cleanCode = sanitizeCode(artifact.code);
+        const babelRuntime = await loadBabelStandalone();
+        if (cancelled) {
+          return;
+        }
+        const transpiled = babelRuntime.transform(cleanCode, {
+          presets: ['react', 'es2017', 'typescript'],
+          parserOpts: { allowReturnOutsideFunction: true },
+          filename: 'artifact.tsx'
+        }).code;
 
-      const transpiled = Babel.transform(cleanCode, {
-        presets: ['react', 'es2017', 'typescript'],
-        parserOpts: { allowReturnOutsideFunction: true },
-        filename: 'artifact.tsx'
-      }).code;
+        const safeR3F = normalizeModule(ReactThreeFiber);
+        const safeDrei = normalizeModule(Drei);
+        const safeMotion = normalizeModule(FramerMotion);
+        const safeCannon = normalizeModule(Cannon);
+        const safeKaTeX: any = (KaTeX as any).default || (KaTeX as any);
+        const safeRapier = normalizeModule(Rapier);
+        const safePostProcessing = normalizeModule(PostProcessing);
+        const runtimeReact = buildReactRuntime();
 
-      // 3. Prepare Libraries (Normalize ESM imports)
-      const safeR3F = normalizeModule(ReactThreeFiber);
-      const safeDrei = normalizeModule(Drei);
-      const safeMotion = normalizeModule(FramerMotion);
-      const safeCannon = normalizeModule(Cannon);
-      const safeKaTeX: any = (KaTeX as any).default || (KaTeX as any);
-      const safeRapier = normalizeModule(Rapier);
-      const safePostProcessing = normalizeModule(PostProcessing);
-      const runtimeReact = buildReactRuntime();
-      
-      // 4. Construct Function
-      // SAFETY: Use explicit string concatenation + newlines to avoid comment issues and template literal breakage
-      const funcBody = [
-        'try {',
-        'const d3 = D3;',
-        transpiled,
-        '} catch (e) {',
-        '  return () => React.createElement("div", {className: "text-red-500 p-4"}, "Initialization Error: " + e.message);',
-        '}'
-      ].join('\n');
+        const funcBody = [
+          'try {',
+          'const d3 = D3;',
+          transpiled,
+          '} catch (e) {',
+          '  return () => React.createElement("div", {className: "text-red-500 p-4"}, "Initialization Error: " + e.message);',
+          '}'
+        ].join('\n');
 
-      const createComponent = new Function(
-        'React', 
-        'Recharts', 
-        'Lucide', 
-        'THREE', 
-        'D3',
-        'R3F', 
-        'Drei', 
-        'Physics', 
-        'Motion', 
-        'MathJS',
-        'KaTeX',
-        'Rapier',
-        'PostProcessing',
-        'Zustand',
-        'Sci3D',
-        'useState',
-        'useEffect',
-        'useRef',
-        'useMemo',
-        'useCallback',
-        'forwardRef',
-        funcBody
-      );
+        const createComponent = new Function(
+          'React',
+          'Recharts',
+          'Lucide',
+          'THREE',
+          'D3',
+          'R3F',
+          'Drei',
+          'Physics',
+          'Motion',
+          'MathJS',
+          'KaTeX',
+          'Rapier',
+          'PostProcessing',
+          'Zustand',
+          'Sci3D',
+          'useState',
+          'useEffect',
+          'useRef',
+          'useMemo',
+          'useCallback',
+          'forwardRef',
+          funcBody
+        );
 
-      const UserComponent = createComponent(
-          runtimeReact, 
-          Recharts, 
-          Lucide, 
+        const UserComponent = createComponent(
+          runtimeReact,
+          Recharts,
+          Lucide,
           Three,
           D3,
-          safeR3F, 
-          safeDrei, 
+          safeR3F,
+          safeDrei,
           safeCannon,
           safeMotion,
           MathJS,
@@ -243,18 +275,24 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
           useMemo,
           useCallback,
           forwardRef
-      );
-      
-      if (typeof UserComponent !== 'function') {
-        throw new Error("Code did not return a valid React component function. Ensure the code ends with 'return ComponentName;'.");
+        );
+
+        if (typeof UserComponent !== 'function') {
+          throw new Error('Code did not return a valid React component function. Ensure the code ends with "return ComponentName;".');
+        }
+
+        setComponent(() => UserComponent);
+      } catch (err: any) {
+        console.error('Compilation Error:', err);
+        setCompileError(err.toString());
       }
+    };
 
-      setComponent(() => UserComponent);
+    run();
 
-    } catch (err: any) {
-      console.error("Compilation Error:", err);
-      setCompileError(err.toString());
-    }
+    return () => {
+      cancelled = true;
+    };
   }, [artifact.code]);
 
   const handleCopy = () => {

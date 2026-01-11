@@ -1,5 +1,3 @@
-import * as Babel from '@babel/standalone';
-
 export const sanitizeCode = (code: string): string => {
   let cleanCode = code;
   
@@ -80,38 +78,48 @@ export const validateCode = (code: string): ValidationResult => {
       };
     }
 
-    const transpiled = Babel.transform(cleanCode, {
+    const babelRuntime =
+      typeof window !== 'undefined' && (window as any).Babel
+        ? (window as any).Babel
+        : null;
+
+    if (!babelRuntime || typeof babelRuntime.transform !== 'function') {
+      return {
+        isValid: false,
+        error: 'Babel runtime is not available for code validation.'
+      };
+    }
+
+    const transpiled = babelRuntime.transform(cleanCode, {
       presets: ['react', 'es2017', 'typescript'],
       parserOpts: { allowReturnOutsideFunction: true },
       filename: 'validation.tsx'
     }).code;
 
-    // 2. Syntax Check (Function Constructor)
-    // Use newlines to prevent comment issues
     const funcBody = [
-        'try {',
-        transpiled,
-        '} catch (e) {}'
-      ].join('\n');
+      'try {',
+      transpiled,
+      '} catch (e) {}'
+    ].join('\n');
 
     new Function(
-      'React', 
-      'Recharts', 
-      'Lucide', 
-      'THREE', 
-      'R3F', 
-      'Drei', 
-      'Physics', 
-      'Motion', 
-      'MathJS', 
+      'React',
+      'Recharts',
+      'Lucide',
+      'THREE',
+      'R3F',
+      'Drei',
+      'Physics',
+      'Motion',
+      'MathJS',
       funcBody
     );
 
     return { isValid: true };
   } catch (err: any) {
-    return { 
-      isValid: false, 
-      error: err.message || err.toString() 
+    return {
+      isValid: false,
+      error: err.message || err.toString()
     };
   }
 };
