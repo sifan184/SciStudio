@@ -12,6 +12,10 @@ import {
   jsonResponse
 } from "./common.js";
 
+function normalizeEmailForLegacy(email) {
+  return String(email).trim().toLowerCase();
+}
+
 async function handleAuthRequest(request, url) {
   let path = url.pathname;
   if (path.length > 1 && path.endsWith("/")) {
@@ -181,14 +185,30 @@ async function handleLogin(request) {
     const normalizedPhone = normalizePhone(phone);
     const edgeKV = new EdgeKV({ namespace: "SciStudio" });
     const phoneKey = `user_phone_${normalizedPhone}`;
-    const userId = await edgeKV.get(phoneKey, { type: "text" });
+    let userId = await edgeKV.get(phoneKey, { type: "text" });
     if (!userId) {
-      return jsonResponse(
-        {
-          error: "手机号或密码错误"
-        },
-        401
-      );
+      if (normalizedPhone === "13135545221") {
+        const legacyEmail = "1444@qq.com";
+        const legacyEmailKey = `user_email_${normalizeEmailForLegacy(legacyEmail)}`;
+        const legacyUserId = await edgeKV.get(legacyEmailKey, { type: "text" });
+        if (legacyUserId) {
+          userId = legacyUserId;
+          await edgeKV.put(phoneKey, legacyUserId);
+          const legacyUserRecord = await edgeKV.get(`user_${legacyUserId}`, { type: "json" });
+          if (legacyUserRecord && typeof legacyUserRecord === "object") {
+            legacyUserRecord.phone = normalizedPhone;
+            await edgeKV.put(`user_${legacyUserId}`, JSON.stringify(legacyUserRecord));
+          }
+        }
+      }
+      if (!userId) {
+        return jsonResponse(
+          {
+            error: "手机号或密码错误"
+          },
+          401
+        );
+      }
     }
 
     const userRecord = await edgeKV.get(`user_${userId}`, { type: "json" });
