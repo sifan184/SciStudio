@@ -50,36 +50,40 @@ const callGlm = async (
     userContent: string
 ): Promise<string> => {
     return await withNetworkRetry(async () => {
-        const response = await fetch("https://api.z.ai/api/paas/v4/chat/completions", {
+        const response = await fetch("/api/ai/glm-chat", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
+                "Content-Type": "application/json"
             },
+            credentials: "include",
             body: JSON.stringify({
                 model,
-                messages: [
-                    { role: "system", content: systemInstruction },
-                    { role: "user", content: userContent }
-                ],
-                max_tokens: 4096,
-                temperature: 0.2
+                apiKey,
+                systemInstruction,
+                userContent
             })
         });
 
+        const text = await response.text().catch(() => "");
+
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`GLM API Error: ${response.status} ${response.statusText} - ${errorText}`);
+            throw new Error(`GLM API Error: ${response.status} ${response.statusText}${text ? " - " + text : ""}`);
         }
 
-        const data = await response.json();
-        const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+        let data: any = null;
+        if (text) {
+            try {
+                data = JSON.parse(text);
+            } catch {
+                data = null;
+            }
+        }
 
-        if (!content) {
+        if (!data || typeof data !== "object" || typeof data.text !== "string") {
             throw new Error("No response content from GLM");
         }
 
-        return typeof content === "string" ? content : String(content);
+        return data.text;
     });
 };
 
