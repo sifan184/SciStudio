@@ -404,6 +404,12 @@ export const generateScienceArtifact = async (
   6.  **R3F**: @react-three/fiber namespace.
       *   CORE COMPONENT: <R3F.Canvas> (Root of all 3D).
       *   Hooks: R3F.useFrame, R3F.useThree, R3F.useLoader.
+      *   IMPORTANT: All R3F hooks MUST be called ONLY from components that are rendered AS CHILDREN of <R3F.Canvas>. Never call R3F.useFrame/useThree/useLoader in a component that directly returns <R3F.Canvas> or in any component that is rendered outside the Canvas tree.
+      *   Recommended pattern:
+          - Define inner scene components (e.g. SolarSystemScene, FieldView) that use R3F hooks.
+          - The main exported component should typically return a layout where <R3F.Canvas> wraps those inner components, for example:
+            const SceneContent = () => { R3F.useFrame(() => { /* animation */ }); return (<group>{/* meshes */}</group>); };
+            const Main = () => (<div className="w-full h-full"><R3F.Canvas>{/* lights, controls */}<SceneContent /></R3F.Canvas></div>);
   7.  **Drei**: @react-three/drei namespace (Helpers).
       *   Common: \`<Drei.OrbitControls />\`, \`<Drei.Stars />\`, \`<Drei.Text />\`, \`<Drei.Html />\`.
   7.  **Physics**: @react-three/cannon namespace (Physics Engine).
