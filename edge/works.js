@@ -316,7 +316,11 @@ async function handleWorkDelete(request, workId) {
     );
   }
   const edgeKV = new EdgeKV({ namespace: "SciStudio" });
-  const ownerId = await edgeKV.get(`work_${workId}_owner`, { type: "text" });
+  let ownerId = "";
+  try {
+    ownerId = await edgeKV.get(`work_${workId}_owner`, { type: "text" });
+  } catch (e) {
+  }
   if (!ownerId || ownerId !== user.id) {
     return jsonResponse(
       {
@@ -325,14 +329,23 @@ async function handleWorkDelete(request, workId) {
       403
     );
   }
-  await deleteWorkRecordFromOss(workId);
-
-  let list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
-  if (Array.isArray(list)) {
-    const filtered = list.filter((item) => item && item.id !== workId);
-    await edgeKV.put(WORKS_INDEX_KEY, JSON.stringify(filtered));
+  try {
+    await deleteWorkRecordFromOss(workId);
+  } catch (e) {
   }
-  await edgeKV.put(`work_${workId}_owner`, "", {});
+
+  try {
+    let list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
+    if (Array.isArray(list)) {
+      const filtered = list.filter((item) => item && item.id !== workId);
+      await edgeKV.put(WORKS_INDEX_KEY, JSON.stringify(filtered));
+    }
+  } catch (e) {
+  }
+  try {
+    await edgeKV.put(`work_${workId}_owner`, "", {});
+  } catch (e) {
+  }
 
   return jsonResponse(
     {
