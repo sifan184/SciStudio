@@ -50,7 +50,7 @@ const callGlm = async (
     userContent: string
 ): Promise<string> => {
     return await withNetworkRetry(async () => {
-        const response = await fetch("https://api.z.ai/api/paas/v4/chat/completions", {
+        const response = await fetch("/api/llm/glm/chat", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
