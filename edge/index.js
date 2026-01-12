@@ -1,7 +1,6 @@
 import { setEnv, jsonResponse } from "./common.js";
 import { handleAuthRequest } from "./auth.js";
 import { handleWorksRequest } from "./works.js";
-import { handleLlmRequest } from "./llm.js";
 
 async function handleRequest(request) {
   const url = new URL(request.url);
@@ -25,10 +24,6 @@ async function handleRequest(request) {
 
   if (pathname.startsWith("/api/works")) {
     return handleWorksRequest(request, url);
-  }
-
-  if (pathname.startsWith("/api/llm/")) {
-    return handleLlmRequest(request, url);
   }
 
   return globalThis.fetch(request);
