@@ -136,8 +136,9 @@ async function deleteWorkRecordFromOss(workId) {
   }
 }
 
-function normalizeEmail(email) {
-  return email.trim().toLowerCase();
+function normalizePhone(phone) {
+  const digits = String(phone).replace(/\D/g, "");
+  return digits;
 }
 
 function generateId(prefix) {
@@ -227,7 +228,7 @@ async function getUserFromSession(sessionId) {
     }
     return {
       id: user.id,
-      email: user.email ?? null
+      phone: user.phone ?? null
     };
   } catch (e) {
     return null;
@@ -280,7 +281,7 @@ export {
   saveWorkRecordToOss,
   loadWorkRecordFromOss,
   deleteWorkRecordFromOss,
-  normalizeEmail,
+  normalizePhone,
   generateId,
   getSessionIdFromRequest,
   buildSessionCookie,

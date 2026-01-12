@@ -27,17 +27,12 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
     duplicate: "做同款"
   };
 
-  const maskEmail = (email: string) => {
-    const parts = email.split("@");
-    if (parts.length !== 2) return email;
-    const name = parts[0];
-    const domain = parts[1];
-    if (name.length <= 2) {
-      return name[0] + "**@" + domain;
-    }
-    const head = name[0];
-    const tail = name[name.length - 1];
-    return `${head}**${tail}@${domain}`;
+  const maskPhone = (phone: string) => {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 7) return digits || phone;
+    const head = digits.slice(0, 3);
+    const tail = digits.slice(-4);
+    return `${head}****${tail}`;
   };
 
   const handleDeleteRequest = (e: React.MouseEvent, id: string) => {
@@ -98,9 +93,9 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
                     <div>
                         {t.created}: {new Date(work.createdAt).toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </div>
-                    {work.ownerEmail && (
+                    {work.ownerPhone && (
                       <div className="mt-1">
-                        {t.creator}: {maskEmail(work.ownerEmail)}
+                        {t.creator}: {maskPhone(work.ownerPhone)}
                       </div>
                     )}
                 </div>

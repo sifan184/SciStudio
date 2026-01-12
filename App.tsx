@@ -79,7 +79,7 @@ interface AppInnerProps {
 function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppInnerProps) {
   interface AuthUser {
     id: string;
-    email: string | null;
+    phone: string | null;
   }
   // Global State
   const [works, setWorks] = useState<ScienceArtifact[]>(() => {
@@ -102,7 +102,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthPanelOpen, setIsAuthPanelOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
-  const [authEmail, setAuthEmail] = useState("");
+  const [authPhone, setAuthPhone] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authPasswordConfirm, setAuthPasswordConfirm] = useState("");
 
@@ -412,7 +412,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
         },
         credentials: "include",
         body: JSON.stringify({
-          email: authEmail,
+          phone: authPhone,
           password: authPassword
         })
       });
@@ -454,7 +454,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
           : null;
       setAuthUser(user ?? null);
       setIsAuthPanelOpen(false);
-      setAuthEmail("");
+      setAuthPhone("");
       setAuthPassword("");
       setAuthPasswordConfirm("");
     } catch (e) {
@@ -563,7 +563,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
           id: workId,
           createdAt: activeWork.createdAt,
           ownerId: activeWork.ownerId,
-          ownerEmail: activeWork.ownerEmail
+          ownerPhone: activeWork.ownerPhone
         };
 
         setWorks(prev =>
@@ -634,7 +634,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
         id: activeWork.id,
         createdAt: activeWork.createdAt,
         ownerId: activeWork.ownerId,
-        ownerEmail: activeWork.ownerEmail
+        ownerPhone: activeWork.ownerPhone
       };
 
       setWorks(prev => prev.map(w => w.id === activeWork.id ? updatedArtifact : w));
@@ -915,7 +915,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
   const navbarRight = authUser ? (
     <>
       <span className="text-xs text-slate-300 max-w-[140px] truncate">
-        {authUser.email}
+        {authUser.phone}
       </span>
       <button
         onClick={handleSignOut}
@@ -960,13 +960,13 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
           </div>
           <div className="space-y-2">
             <div className="space-y-1">
-              <div className="text-[11px] text-slate-300">邮箱</div>
+              <div className="text-[11px] text-slate-300">手机号</div>
               <input
-                type="email"
-                value={authEmail}
-                onChange={e => setAuthEmail(e.target.value)}
+                type="tel"
+                value={authPhone}
+                onChange={e => setAuthPhone(e.target.value)}
                 className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                placeholder="you@example.com"
+                placeholder="请输入手机号"
               />
             </div>
             <div className="space-y-1">
@@ -998,7 +998,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
             )}
             <button
               onClick={handleAuthSubmit}
-              disabled={authLoading || !authEmail || !authPassword}
+              disabled={authLoading || !authPhone || !authPassword}
               className="w-full mt-1 px-3 py-1.5 rounded-md text-xs bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {authMode === "login" ? "登录" : "注册"}

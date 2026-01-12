@@ -35,7 +35,7 @@ type LandingPendingAction = 'none' | 'create' | 'viewWorks';
 export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewWorksClick }) => {
   interface AuthUser {
     id: string;
-    email: string | null;
+    phone: string | null;
   }
   const allWorks = [INITIAL_ARTIFACT, ...ADDITIONAL_WORKS];
   const totalWorks = allWorks.length;
@@ -45,7 +45,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
   const [worksCount, setWorksCount] = React.useState(totalWorks);
   const [isAuthOpen, setIsAuthOpen] = React.useState(false);
   const [authMode, setAuthMode] = React.useState<"login" | "signup">("login");
-  const [authEmail, setAuthEmail] = React.useState("");
+  const [authPhone, setAuthPhone] = React.useState("");
   const [authPassword, setAuthPassword] = React.useState("");
   const [authPasswordConfirm, setAuthPasswordConfirm] = React.useState("");
   const [authLoading, setAuthLoading] = React.useState(false);
@@ -163,7 +163,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
   };
 
   const handleAuthSubmit = async () => {
-    if (!authEmail || !authPassword) {
+    if (!authPhone || !authPassword) {
       return;
     }
     setAuthError(null);
@@ -181,7 +181,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
         },
         credentials: "include",
         body: JSON.stringify({
-          email: authEmail,
+          phone: authPhone,
           password: authPassword
         })
       });
@@ -208,7 +208,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
           : null;
       setAuthUser(user ?? null);
       setIsAuthOpen(false);
-      setAuthEmail("");
+      setAuthPhone("");
       setAuthPassword("");
       setAuthPasswordConfirm("");
       setAuthError(null);
@@ -287,7 +287,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
             authUser ? (
               <>
                 <span className="text-xs text-slate-300 max-w-[140px] truncate">
-                  {authUser.email}
+                  {authUser.phone}
                 </span>
                 <button
                   onClick={handleSignOut}
@@ -343,13 +343,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
                     </div>
                     <div className="space-y-2">
                       <div className="space-y-1">
-                        <div className="text-[11px] text-slate-300">邮箱</div>
+                        <div className="text-[11px] text-slate-300">手机号</div>
                         <input
-                          type="email"
-                          value={authEmail}
-                          onChange={e => setAuthEmail(e.target.value)}
+                          type="tel"
+                          value={authPhone}
+                          onChange={e => setAuthPhone(e.target.value)}
                           className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                          placeholder="you@example.com"
+                          placeholder="请输入手机号"
                         />
                       </div>
                       <div className="space-y-1">
@@ -381,7 +381,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onCreateClick, onViewW
                       )}
                       <button
                         onClick={handleAuthSubmit}
-                        disabled={authLoading || !authEmail || !authPassword}
+                        disabled={authLoading || !authPhone || !authPassword}
                         className="w-full mt-1 px-3 py-1.5 rounded-md text-xs bg-brand-600 text-white hover:bg-brand-500 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {authMode === "login" ? "登录" : "注册"}

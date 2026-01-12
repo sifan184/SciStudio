@@ -120,7 +120,7 @@ async function handleWorkCreate(request) {
       description: description || "",
       code: "",
       ownerId: user.id,
-      ownerEmail: user.email ?? null
+      ownerPhone: user.phone ?? null
     };
   } else {
     artifact = {
@@ -128,14 +128,14 @@ async function handleWorkCreate(request) {
       id: workId,
       createdAt: now,
       ownerId: user.id,
-      ownerEmail: user.email ?? null
+      ownerPhone: user.phone ?? null
     };
   }
 
   const record = {
     id: workId,
     userId: user.id,
-    ownerEmail: user.email ?? null,
+    ownerPhone: user.phone ?? null,
     artifact,
     messages
   };
@@ -165,7 +165,7 @@ async function handleWorkCreate(request) {
     description: artifact.description,
     createdAt: now,
     ownerId: user.id,
-    ownerEmail: user.email ?? null
+    ownerPhone: user.phone ?? null
   };
   await edgeKV.put(WORKS_INDEX_KEY, JSON.stringify([summary, ...currentList]));
   await edgeKV.put(`work_${workId}_owner`, user.id);
@@ -210,7 +210,7 @@ async function handleWorkGet(request, workId) {
     ...baseArtifact,
     id: record.id,
     ownerId: record.userId,
-    ownerEmail: record.ownerEmail ?? null,
+    ownerPhone: record.ownerPhone ?? null,
     createdAt
   };
   return jsonResponse(
@@ -266,7 +266,7 @@ async function handleWorkUpdate(request, workId) {
   const updatedRecord = {
     id: workId,
     userId: existing.userId,
-    ownerEmail: existing.ownerEmail ?? user.email ?? null,
+    ownerPhone: existing.ownerPhone ?? user.phone ?? null,
     createdAt: typeof existing.createdAt === "number" ? existing.createdAt : now,
     updatedAt: now,
     artifact,

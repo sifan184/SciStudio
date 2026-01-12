@@ -1,6 +1,6 @@
 import {
   EDGE_KV_NAMESPACE,
-  normalizeEmail,
+  normalizePhone,
   parseJsonBody,
   generateId,
   getUserFromRequest,
@@ -65,15 +65,29 @@ async function handleAuthRequest(request, url) {
   );
 }
 
+function isValidPhone(phone) {
+  const normalized = normalizePhone(phone);
+  return normalized.length === 11 && normalized.startsWith("1");
+}
+
 async function handleSignup(request) {
   const body = await parseJsonBody(request);
-  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (!email || !password) {
+  if (!phone || !password) {
     return jsonResponse(
       {
-        error: "邮箱和密码不能为空"
+        error: "手机号和密码不能为空"
+      },
+      400
+    );
+  }
+
+  if (!isValidPhone(phone)) {
+    return jsonResponse(
+      {
+        error: "手机号格式不正确"
       },
       400
     );
@@ -89,14 +103,14 @@ async function handleSignup(request) {
   }
 
   try {
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedPhone = normalizePhone(phone);
     const edgeKV = new EdgeKV({ namespace: "SciStudio" });
-    const emailKey = `user_email_${normalizedEmail}`;
-    const existingUserId = await edgeKV.get(emailKey, { type: "text" });
+    const phoneKey = `user_phone_${normalizedPhone}`;
+    const existingUserId = await edgeKV.get(phoneKey, { type: "text" });
     if (existingUserId) {
       return jsonResponse(
         {
-          error: "该邮箱已被注册"
+          error: "该手机号已被注册"
         },
         400
       );
@@ -106,13 +120,13 @@ async function handleSignup(request) {
     const passwordHash = hashPassword(password);
     const userRecord = {
       id: userId,
-      email: normalizedEmail,
+      phone: normalizedPhone,
       passwordHash,
       createdAt: Date.now()
     };
 
     await edgeKV.put(`user_${userId}`, JSON.stringify(userRecord));
-    await edgeKV.put(emailKey, userId);
+    await edgeKV.put(phoneKey, userId);
 
     const sessionId = await createSession(userId);
     const cookie = buildSessionCookie(sessionId);
@@ -121,7 +135,7 @@ async function handleSignup(request) {
       {
         user: {
           id: userRecord.id,
-          email: userRecord.email
+          phone: userRecord.phone
         }
       },
       200,
@@ -142,27 +156,36 @@ async function handleSignup(request) {
 
 async function handleLogin(request) {
   const body = await parseJsonBody(request);
-  const email = typeof body.email === "string" ? body.email.trim() : "";
+  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (!email || !password) {
+  if (!phone || !password) {
     return jsonResponse(
       {
-        error: "邮箱和密码不能为空"
+        error: "手机号和密码不能为空"
       },
       400
     );
   }
 
+  if (!isValidPhone(phone)) {
+    return jsonResponse(
+      {
+        error: "手机号或密码错误"
+      },
+      401
+    );
+  }
+
   try {
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedPhone = normalizePhone(phone);
     const edgeKV = new EdgeKV({ namespace: "SciStudio" });
-    const emailKey = `user_email_${normalizedEmail}`;
-    const userId = await edgeKV.get(emailKey, { type: "text" });
+    const phoneKey = `user_phone_${normalizedPhone}`;
+    const userId = await edgeKV.get(phoneKey, { type: "text" });
     if (!userId) {
       return jsonResponse(
         {
-          error: "邮箱或密码错误"
+          error: "手机号或密码错误"
         },
         401
       );
@@ -172,7 +195,7 @@ async function handleLogin(request) {
     if (!userRecord || typeof userRecord !== "object") {
       return jsonResponse(
         {
-          error: "邮箱或密码错误"
+          error: "手机号或密码错误"
         },
         401
       );
@@ -183,7 +206,7 @@ async function handleLogin(request) {
     if (!storedHash || storedHash !== currentHash) {
       return jsonResponse(
         {
-          error: "邮箱或密码错误"
+          error: "手机号或密码错误"
         },
         401
       );
@@ -196,7 +219,7 @@ async function handleLogin(request) {
       {
         user: {
           id: userRecord.id,
-          email: userRecord.email ?? null
+          phone: userRecord.phone ?? null
         }
       },
       200,

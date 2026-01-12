@@ -9,7 +9,7 @@ export interface ScienceArtifact {
   description: string;
   code: string;
   ownerId?: string;
-  ownerEmail?: string | null;
+  ownerPhone?: string | null;
 }
 
 export interface ChatMessage {
