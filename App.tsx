@@ -626,37 +626,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
           images, 
           currentModelConfig, 
           activeWork, 
-          newHistory,
-          (delta: string) => {
-            if (!delta) return;
-            if (currentModelConfig.provider !== "Zhipu") return;
-            let localId = "";
-            setMessagesMap(prev => {
-              const list = prev[activeWork.id] || newHistory;
-              const last = list[list.length - 1];
-              if (!localId || !last || last.id !== localId || last.role !== "model") {
-                const msg: ChatMessage = {
-                  id: Date.now().toString(),
-                  role: "model",
-                  text: delta
-                };
-                localId = msg.id;
-                return {
-                  ...prev,
-                  [activeWork.id]: [...list, msg]
-                };
-              }
-              const updated: ChatMessage = {
-                ...last,
-                text: last.text + delta
-              };
-              const nextList = [...list.slice(0, list.length - 1), updated];
-              return {
-                ...prev,
-                [activeWork.id]: nextList
-              };
-            });
-          }
+          newHistory
       );
 
       const updatedArtifact: ScienceArtifact = {
@@ -713,13 +683,6 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
       ) {
         displayMessage =
           "当前调用的 GLM 接口返回了 401 错误，说明使用的令牌无效或已过期。请在配置中检查并更新 GLM API Key 后再重试，此问题不会影响你已有的作品内容。";
-      } else if (
-        rawMessage.includes("GLM API Error: 429") ||
-        rawMessage.includes("Too Many Requests") ||
-        rawMessage.includes("High concurrency usage of this API")
-      ) {
-        displayMessage =
-          "当前 GLM 接口并发或调用频率过高，服务端返回 429 限流。请稍等片刻后再试，或降低同时发起的请求数量，如有长期高并发需求建议在智谱控制台提升配额。";
       } else if (
         rawMessage.includes("Failed to generate valid code after") ||
         rawMessage.includes("validation.tsx: Unexpected token")

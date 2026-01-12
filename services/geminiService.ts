@@ -50,119 +50,37 @@ const callGlm = async (
     userContent: string
 ): Promise<string> => {
     return await withNetworkRetry(async () => {
-        const response = await fetch("/api/ai/glm-chat", {
+        const response = await fetch("https://api.z.ai/api/paas/v4/chat/completions", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
             },
-            credentials: "include",
             body: JSON.stringify({
                 model,
-                apiKey,
-                systemInstruction,
-                userContent
+                messages: [
+                    { role: "system", content: systemInstruction },
+                    { role: "user", content: userContent }
+                ],
+                max_tokens: 4096,
+                temperature: 0.2
             })
         });
 
-        const text = await response.text().catch(() => "");
-
         if (!response.ok) {
-            throw new Error(`GLM API Error: ${response.status} ${response.statusText}${text ? " - " + text : ""}`);
+            const errorText = await response.text();
+            throw new Error(`GLM API Error: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        let data: any = null;
-        if (text) {
-            try {
-                data = JSON.parse(text);
-            } catch {
-                data = null;
-            }
-        }
+        const data = await response.json();
+        const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
 
-        if (!data || typeof data !== "object" || typeof data.text !== "string") {
+        if (!content) {
             throw new Error("No response content from GLM");
         }
 
-        return data.text;
+        return typeof content === "string" ? content : String(content);
     });
-};
-
-const callGlmStream = async (
-    model: string,
-    apiKey: string,
-    systemInstruction: string,
-    userContent: string,
-    onStreamChunk?: (delta: string) => void
-): Promise<string> => {
-    const response = await fetch("/api/ai/glm-chat/stream", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        credentials: "include",
-        body: JSON.stringify({
-            model,
-            apiKey,
-            systemInstruction,
-            userContent
-        })
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        throw new Error(`GLM API Error: ${response.status} ${response.statusText}${errorText ? " - " + errorText : ""}`);
-    }
-
-    const contentType = response.headers.get("content-type") || "";
-    if (!response.body || typeof response.body.getReader !== "function" || !contentType.includes("text/event-stream")) {
-        const text = await response.text().catch(() => "");
-        if (!text) {
-            throw new Error("No response content from GLM");
-        }
-        if (onStreamChunk) {
-            onStreamChunk(text);
-        }
-        return text;
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-    let fullText = "";
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-            break;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split(/\r?\n/);
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-            const s = line.trim();
-            if (!s || !s.startsWith("data:")) continue;
-            const payload = s.slice(5).trim();
-            if (!payload || payload === "[DONE]") {
-                continue;
-            }
-            try {
-                const json = JSON.parse(payload);
-                if (json && typeof json.delta === "string") {
-                    fullText += json.delta;
-                    if (onStreamChunk) {
-                        onStreamChunk(json.delta);
-                    }
-                }
-            } catch {
-            }
-        }
-    }
-    if (!fullText && buffer) {
-        fullText = buffer;
-    }
-    if (!fullText) {
-        throw new Error("No response content from GLM");
-    }
-    return fullText;
 };
 
 const buildCodeFromSceneDsl = (dsl: any): string => {
@@ -335,8 +253,7 @@ export const generateScienceArtifact = async (
   images: string[], 
   modelConfig: ModelConfig,
   currentArtifact: ScienceArtifact | null,
-  history: ChatMessage[],
-  onStreamChunk?: (delta: string) => void
+  history: ChatMessage[]
 ): Promise<GenerationResponse> => {
   
   const isGlmProvider = modelConfig.provider === "Zhipu";
@@ -1235,7 +1152,7 @@ export const generateScienceArtifact = async (
         console.log(`[Model] Generation Attempt ${attempt + 1} using provider ${modelConfig.provider} model ${modelConfig.modelId}`);
         
         if (isGlmProvider) {
-            const textResponse = await callGlmStream(modelConfig.modelId, apiKey, sysPrompt, currentPayload, onStreamChunk);
+            const textResponse = await callGlm(modelConfig.modelId, apiKey, sysPrompt, currentPayload);
             const result = parseResponse(textResponse, currentArtifact);
             const validation = validateCode(result.artifact.code);
             const sceneLint = lint3DScene(result.artifact.code);
