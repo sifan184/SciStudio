@@ -779,6 +779,73 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
     };
   }, []);
 
+  useEffect(() => {
+    if (authLoading) return;
+    if (!authUser) return;
+    if (!currentWorkId || !currentWorkId.startsWith("w_")) return;
+    const work = works.find(w => w.id === currentWorkId);
+    if (work && typeof work.code === "string" && work.code) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/works/${currentWorkId}`, {
+          credentials: "include"
+        });
+        if (!res.ok) {
+          if (res.status === 401) {
+            if (!cancelled) {
+              setAuthUser(null);
+              onBackToLanding();
+            }
+            return;
+          }
+          if (cancelled) return;
+          let message = `打开作品失败（HTTP ${res.status}）`;
+          try {
+            const text = await res.text();
+            if (text) {
+              try {
+                const data = JSON.parse(text);
+                if (data && typeof data === "object" && typeof (data as any).error === "string") {
+                  message = (data as any).error;
+                } else {
+                  message = text;
+                }
+              } catch {
+                message = text;
+              }
+            }
+          } catch {
+          }
+          setError(message);
+          return;
+        }
+        const json = await res.json();
+        if (cancelled) return;
+        const remoteWork = json.work as ScienceArtifact;
+        const remoteMessages = (json.messages as ChatMessage[]) || [];
+        setWorks(prev => {
+          const exists = prev.some(w => w.id === remoteWork.id);
+          if (exists) {
+            return prev.map(w => (w.id === remoteWork.id ? remoteWork : w));
+          }
+          return [remoteWork, ...prev];
+        });
+        setMessagesMap(prev => ({
+          ...prev,
+          [remoteWork.id]: remoteMessages
+        }));
+        setCurrentWorkId(remoteWork.id);
+      } catch {
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, authUser, currentWorkId, works, onBackToLanding]);
+
   // --- Resize Handlers ---
   const startResizing = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

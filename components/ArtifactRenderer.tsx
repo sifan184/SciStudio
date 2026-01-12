@@ -193,19 +193,12 @@ export const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, on
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    if (!artifact.code) return;
     let cancelled = false;
 
     const run = async () => {
       try {
         setCompileError(null);
-        if (!artifact.code || !artifact.code.trim()) {
-          setComponent(() => () => (
-            <div className="p-20 text-slate-500 flex items-center justify-center">
-              当前作品还没有可执行的代码内容，请先通过 AI 生成或手动编辑代码。
-            </div>
-          ));
-          return;
-        }
         const cleanCode = sanitizeCode(artifact.code);
         const babelRuntime = await loadBabelStandalone();
         if (cancelled) {
