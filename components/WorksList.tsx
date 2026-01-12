@@ -29,7 +29,7 @@ export const WorksList: React.FC<WorksListProps> = ({ works, onSelect, onCreate,
 
   const maskPhone = (phone: string) => {
     const digits = phone.replace(/\D/g, "");
-    if (digits.length < 7) return digits || phone;
+    if (digits.length < 7) return phone;
     const head = digits.slice(0, 3);
     const tail = digits.slice(-4);
     return `${head}****${tail}`;

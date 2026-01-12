@@ -959,14 +959,14 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
             </button>
           </div>
           <div className="space-y-2">
-            <div className="space-y-1">
+              <div className="space-y-1">
               <div className="text-[11px] text-slate-300">手机号</div>
               <input
                 type="tel"
                 value={authPhone}
                 onChange={e => setAuthPhone(e.target.value)}
                 className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-xs text-slate-100 outline-none focus:border-brand-500"
-                placeholder="请输入手机号"
+                placeholder="请输入 11 位手机号"
               />
             </div>
             <div className="space-y-1">

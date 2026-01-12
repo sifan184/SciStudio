@@ -12,10 +12,6 @@ import {
   jsonResponse
 } from "./common.js";
 
-function normalizeEmailForLegacy(email) {
-  return String(email).trim().toLowerCase();
-}
-
 async function handleAuthRequest(request, url) {
   let path = url.pathname;
   if (path.length > 1 && path.endsWith("/")) {
@@ -69,11 +65,6 @@ async function handleAuthRequest(request, url) {
   );
 }
 
-function isValidPhone(phone) {
-  const normalized = normalizePhone(phone);
-  return normalized.length === 11 && normalized.startsWith("1");
-}
-
 async function handleSignup(request) {
   const body = await parseJsonBody(request);
   const phone = typeof body.phone === "string" ? body.phone.trim() : "";
@@ -88,10 +79,11 @@ async function handleSignup(request) {
     );
   }
 
-  if (!isValidPhone(phone)) {
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone || normalizedPhone.length !== 11) {
     return jsonResponse(
       {
-        error: "手机号格式不正确"
+        error: "手机号格式不正确，请输入 11 位数字手机号"
       },
       400
     );
@@ -107,7 +99,6 @@ async function handleSignup(request) {
   }
 
   try {
-    const normalizedPhone = normalizePhone(phone);
     const edgeKV = new EdgeKV({ namespace: "SciStudio" });
     const phoneKey = `user_phone_${normalizedPhone}`;
     const existingUserId = await edgeKV.get(phoneKey, { type: "text" });
@@ -172,43 +163,18 @@ async function handleLogin(request) {
     );
   }
 
-  if (!isValidPhone(phone)) {
-    return jsonResponse(
-      {
-        error: "手机号或密码错误"
-      },
-      401
-    );
-  }
-
   try {
     const normalizedPhone = normalizePhone(phone);
     const edgeKV = new EdgeKV({ namespace: "SciStudio" });
     const phoneKey = `user_phone_${normalizedPhone}`;
-    let userId = await edgeKV.get(phoneKey, { type: "text" });
+    const userId = await edgeKV.get(phoneKey, { type: "text" });
     if (!userId) {
-      if (normalizedPhone === "13135545221") {
-        const legacyEmail = "1444@qq.com";
-        const legacyEmailKey = `user_email_${normalizeEmailForLegacy(legacyEmail)}`;
-        const legacyUserId = await edgeKV.get(legacyEmailKey, { type: "text" });
-        if (legacyUserId) {
-          userId = legacyUserId;
-          await edgeKV.put(phoneKey, legacyUserId);
-          const legacyUserRecord = await edgeKV.get(`user_${legacyUserId}`, { type: "json" });
-          if (legacyUserRecord && typeof legacyUserRecord === "object") {
-            legacyUserRecord.phone = normalizedPhone;
-            await edgeKV.put(`user_${legacyUserId}`, JSON.stringify(legacyUserRecord));
-          }
-        }
-      }
-      if (!userId) {
-        return jsonResponse(
-          {
-            error: "手机号或密码错误"
-          },
-          401
-        );
-      }
+      return jsonResponse(
+        {
+          error: "手机号或密码错误"
+        },
+        401
+      );
     }
 
     const userRecord = await edgeKV.get(`user_${userId}`, { type: "json" });

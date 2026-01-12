@@ -137,7 +137,7 @@ async function deleteWorkRecordFromOss(workId) {
 }
 
 function normalizePhone(phone) {
-  const digits = String(phone).replace(/\D/g, "");
+  const digits = String(phone || "").replace(/\D/g, "");
   return digits;
 }
 
