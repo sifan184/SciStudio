@@ -47,10 +47,11 @@ const callGlm = async (
     model: string,
     apiKey: string,
     systemInstruction: string,
-    userContent: string
+    userContent: string,
+    onStreamChunk?: (delta: string) => void
 ): Promise<string> => {
     return await withNetworkRetry(async () => {
-        const response = await fetch("/api/ai/glm-chat", {
+        const response = await fetch("/api/ai/glm-chat/stream", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -64,26 +65,61 @@ const callGlm = async (
             })
         });
 
-        const text = await response.text().catch(() => "");
-
         if (!response.ok) {
-            throw new Error(`GLM API Error: ${response.status} ${response.statusText}${text ? " - " + text : ""}`);
+            const errorText = await response.text().catch(() => "");
+            throw new Error(`GLM API Error: ${response.status} ${response.statusText}${errorText ? " - " + errorText : ""}`);
         }
 
-        let data: any = null;
-        if (text) {
-            try {
-                data = JSON.parse(text);
-            } catch {
-                data = null;
+        const contentType = response.headers.get("content-type") || "";
+        if (!response.body || typeof response.body.getReader !== "function" || !contentType.includes("text/event-stream")) {
+            const text = await response.text().catch(() => "");
+            if (!text) {
+                throw new Error("No response content from GLM");
+            }
+            if (onStreamChunk) {
+                onStreamChunk(text);
+            }
+            return text;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let fullText = "";
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+                const s = line.trim();
+                if (!s || !s.startsWith("data:")) continue;
+                const payload = s.slice(5).trim();
+                if (!payload || payload === "[DONE]") {
+                    continue;
+                }
+                try {
+                    const json = JSON.parse(payload);
+                    if (json && typeof json.delta === "string") {
+                        fullText += json.delta;
+                        if (onStreamChunk) {
+                            onStreamChunk(json.delta);
+                        }
+                    }
+                } catch {
+                }
             }
         }
-
-        if (!data || typeof data !== "object" || typeof data.text !== "string") {
+        if (!fullText && buffer) {
+            fullText = buffer;
+        }
+        if (!fullText) {
             throw new Error("No response content from GLM");
         }
-
-        return data.text;
+        return fullText;
     });
 };
 
@@ -257,7 +293,8 @@ export const generateScienceArtifact = async (
   images: string[], 
   modelConfig: ModelConfig,
   currentArtifact: ScienceArtifact | null,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  onStreamChunk?: (delta: string) => void
 ): Promise<GenerationResponse> => {
   
   const isGlmProvider = modelConfig.provider === "Zhipu";
@@ -1156,7 +1193,7 @@ export const generateScienceArtifact = async (
         console.log(`[Model] Generation Attempt ${attempt + 1} using provider ${modelConfig.provider} model ${modelConfig.modelId}`);
         
         if (isGlmProvider) {
-            const textResponse = await callGlm(modelConfig.modelId, apiKey, sysPrompt, currentPayload);
+            const textResponse = await callGlm(modelConfig.modelId, apiKey, sysPrompt, currentPayload, onStreamChunk);
             const result = parseResponse(textResponse, currentArtifact);
             const validation = validateCode(result.artifact.code);
             const sceneLint = lint3DScene(result.artifact.code);

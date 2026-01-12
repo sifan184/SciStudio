@@ -626,7 +626,37 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
           images, 
           currentModelConfig, 
           activeWork, 
-          newHistory
+          newHistory,
+          (delta: string) => {
+            if (!delta) return;
+            if (currentModelConfig.provider !== "Zhipu") return;
+            let localId = "";
+            setMessagesMap(prev => {
+              const list = prev[activeWork.id] || newHistory;
+              const last = list[list.length - 1];
+              if (!localId || !last || last.id !== localId || last.role !== "model") {
+                const msg: ChatMessage = {
+                  id: Date.now().toString(),
+                  role: "model",
+                  text: delta
+                };
+                localId = msg.id;
+                return {
+                  ...prev,
+                  [activeWork.id]: [...list, msg]
+                };
+              }
+              const updated: ChatMessage = {
+                ...last,
+                text: last.text + delta
+              };
+              const nextList = [...list.slice(0, list.length - 1), updated];
+              return {
+                ...prev,
+                [activeWork.id]: nextList
+              };
+            });
+          }
       );
 
       const updatedArtifact: ScienceArtifact = {
