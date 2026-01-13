@@ -192,6 +192,16 @@ async function handleWorkGet(request, workId) {
   }
   const record = await loadWorkRecordFromOss(workId);
   if (!record || !record.artifact) {
+    try {
+      const edgeKV = new EdgeKV({ namespace: "SciStudio" });
+      let list = await edgeKV.get(WORKS_INDEX_KEY, { type: "json" });
+      if (Array.isArray(list)) {
+        const filtered = list.filter((item) => item && item.id !== workId);
+        await edgeKV.put(WORKS_INDEX_KEY, JSON.stringify(filtered));
+      }
+      await edgeKV.put(`work_${workId}_owner`, "", {});
+    } catch (e) {
+    }
     return jsonResponse(
       {
         error: "作品不存在"

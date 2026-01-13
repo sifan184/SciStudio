@@ -92,11 +92,19 @@ async function loadWorkRecordFromOss(workId) {
   } catch (e) {
   }
   const fallbackKey = `work_${workId}_full`;
-  const workInfoKV = new EdgeKV({ namespace: "WorkInfo" });
-  let text = await workInfoKV.get(fallbackKey, { type: "text" });
+  let text = "";
+  try {
+    const workInfoKV = new EdgeKV({ namespace: "WorkInfo" });
+    text = await workInfoKV.get(fallbackKey, { type: "text" });
+  } catch (e) {
+  }
   if (!text) {
-    const legacyKV = new EdgeKV({ namespace: EDGE_KV_NAMESPACE });
-    text = await legacyKV.get(fallbackKey, { type: "text" });
+    try {
+      const legacyKV = new EdgeKV({ namespace: "SciStudio" });
+      text = await legacyKV.get(fallbackKey, { type: "text" });
+    } catch (e) {
+      return null;
+    }
   }
   if (!text) {
     return null;
@@ -124,15 +132,15 @@ async function deleteWorkRecordFromOss(workId) {
   } catch (e) {
   }
   const fallbackKey = `work_${workId}_full`;
-  const workInfoKV = new EdgeKV({ namespace: "WorkInfo" });
   try {
+    const workInfoKV = new EdgeKV({ namespace: "WorkInfo" });
     await workInfoKV.delete(fallbackKey);
-  } catch {
+  } catch (e) {
   }
-  const legacyKV = new EdgeKV({ namespace: "SciStudio" });
   try {
+    const legacyKV = new EdgeKV({ namespace: "SciStudio" });
     await legacyKV.delete(fallbackKey);
-  } catch {
+  } catch (e) {
   }
 }
 
