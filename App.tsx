@@ -784,7 +784,8 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
     if (!authUser) return;
     if (!currentWorkId || !currentWorkId.startsWith("w_")) return;
     const work = works.find(w => w.id === currentWorkId);
-    if (work && typeof work.code === "string" && work.code) {
+    const existingMessages = messagesMap[currentWorkId] || [];
+    if (work && typeof work.code === "string" && work.code && existingMessages.length > 0) {
       return;
     }
     let cancelled = false;
@@ -844,7 +845,7 @@ function AppInner({ onBackToLanding, entryAction, onEntryActionConsumed }: AppIn
     return () => {
       cancelled = true;
     };
-  }, [authLoading, authUser, currentWorkId, works, onBackToLanding]);
+  }, [authLoading, authUser, currentWorkId, works, messagesMap, onBackToLanding]);
 
   // --- Resize Handlers ---
   const startResizing = useCallback((e: React.MouseEvent) => {
